@@ -77,6 +77,11 @@ select = [
     "SIM", # flake8-simplify
     "RUF", # ruff-specific
 ]
+ignore = [
+    "RUF001", # 全面日本語コードベースのため、文字列内の全角記号を許容
+    "RUF002", # docstring 内の全角記号を許容
+    "RUF003", # コメント内の全角記号を許容
+]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["N802", "N803"]  # テスト関数・引数名の命名規約を緩和
