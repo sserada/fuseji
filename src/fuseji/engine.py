@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from .recognizers.base import default_recognizers
 from .strategies import Placeholder
@@ -69,6 +69,24 @@ class Masker:
         else:
             masked_text, mapping = self._strategy.mask(text, entities)
         return MaskResult(text=masked_text, entities=entities, mapping=mapping)
+
+    def mask_json(self, data: Any) -> Any:
+        """JSON 互換のデータ構造を再帰的にマスクして返す。
+
+        対象: str（mask() を適用）, dict（値のみ再帰）, list/tuple（要素を再帰）。
+        その他の型（int, float, bool, None など）は素通し。
+
+        辞書のキーは PII を含まない前提で、値のみマスクする。
+        """
+        if isinstance(data, str):
+            return self.mask(data).text
+        if isinstance(data, dict):
+            return {k: self.mask_json(v) for k, v in data.items()}
+        if isinstance(data, list):
+            return [self.mask_json(v) for v in data]
+        if isinstance(data, tuple):
+            return tuple(self.mask_json(v) for v in data)
+        return data
 
 
 def _resolve_overlaps(entities: Sequence[Entity]) -> list[Entity]:
