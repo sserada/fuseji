@@ -115,6 +115,8 @@ def _mask_with_vault(
     excluded type（vault.assign が None を返す）の場合は番号なしの
     `<TYPE>` 形式でマスクし、mapping には残さない（復元不可）。
     """
+    from .strategies import _replace_spans
+
     replacements: list[tuple[int, int, str]] = []
     mapping: dict[str, str] = {}
     for e in entities:
@@ -125,7 +127,4 @@ def _mask_with_vault(
             mapping[ph] = e.text
         replacements.append((e.start, e.end, ph))
 
-    result = text
-    for start, end, sub in sorted(replacements, key=lambda x: x[0], reverse=True):
-        result = result[:start] + sub + result[end:]
-    return result, mapping
+    return _replace_spans(text, replacements), mapping
