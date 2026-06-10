@@ -23,11 +23,24 @@ class MaskStrategy(Protocol):
 
 
 def _replace_spans(text: str, replacements: list[tuple[int, int, str]]) -> str:
-    """指定範囲を後ろから置換してオフセットずれを防ぐ."""
-    result = text
-    for start, end, sub in sorted(replacements, key=lambda x: x[0], reverse=True):
-        result = result[:start] + sub + result[end:]
-    return result
+    """指定範囲を 1 パスで置換して新しい文字列を返す。
+
+    `replacements` は ``(start, end, substitute)`` のリスト。範囲はオーバー
+    ラップしない前提（Masker のオーバーラップ解決後に呼ばれる）。
+
+    文字列の繰り返しスライス再構築は O(k·n) になるため、segment list で
+    1 パスにまとめて O(n+k) で完結させる。
+    """
+    if not replacements:
+        return text
+    out: list[str] = []
+    cursor = 0
+    for start, end, sub in sorted(replacements, key=lambda x: x[0]):
+        out.append(text[cursor:start])
+        out.append(sub)
+        cursor = end
+    out.append(text[cursor:])
+    return "".join(out)
 
 
 @dataclass(frozen=True, slots=True)
