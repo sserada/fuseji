@@ -31,6 +31,9 @@ dependencies = []
 ginza = [
     "ginza>=5.2.0",
     "ja-ginza>=5.2.0",
+    # spaCy CLI が click を直接 import するが typer 0.26 系では transitive で
+    # 引かれないため明示
+    "click>=8.4.1",
 ]
 server = [
     "fastapi>=0.110",
