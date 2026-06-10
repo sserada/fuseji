@@ -61,9 +61,20 @@ class TestNormalize:
 
 
 class TestDefaultRecognizers:
-    def test_最初は空_実装は後続コミットで登録(self) -> None:
-        # Commit 5 で全認識器を登録する
-        assert default_recognizers() == ()
+    def test_v0_1_の_5_認識器を返す(self) -> None:
+        recs = default_recognizers()
+        types = {r.entity_type for r in recs}
+        assert types == {
+            "EMAIL",
+            "CREDIT_CARD",
+            "MY_NUMBER",
+            "JP_PHONE_NUMBER",
+            "JP_POSTAL_CODE",
+        }
 
     def test_戻り値はタプル(self) -> None:
         assert isinstance(default_recognizers(), tuple)
+
+    def test_各認識器は_analyze_を持つ(self) -> None:
+        for r in default_recognizers():
+            assert callable(r.analyze)

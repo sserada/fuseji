@@ -67,6 +67,20 @@ def normalize(text: str) -> str:
 def default_recognizers() -> tuple[Recognizer, ...]:
     """v0.1 のデフォルト認識器セット。
 
-    各認識器の実装が揃った段階で登録する（Issue #3 内で更新予定）。
+    EMAIL, CREDIT_CARD, MY_NUMBER, JP_PHONE_NUMBER, JP_POSTAL_CODE の順で返す。
+    順序は Masker エンジン側のオーバーラップ解決には影響しない（スコア優先）。
     """
-    return ()
+    # 循環インポート回避のため遅延 import
+    from .credit_card import CreditCardRecognizer
+    from .email import EmailRecognizer
+    from .jp_phone import JpPhoneRecognizer
+    from .jp_postal import JpPostalRecognizer
+    from .my_number import MyNumberRecognizer
+
+    return (
+        EmailRecognizer(),
+        CreditCardRecognizer(),
+        MyNumberRecognizer(),
+        JpPhoneRecognizer(),
+        JpPostalRecognizer(),
+    )
