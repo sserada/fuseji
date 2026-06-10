@@ -2,6 +2,7 @@
 name = "fuseji"
 version = "0.0.0"
 description = "日本語特化の PII 検出・マスキングミドルウェア（LLM オブザーバビリティ向け）"
+readme = "README.md"
 requires-python = ">=3.10"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
