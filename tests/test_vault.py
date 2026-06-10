@@ -93,6 +93,30 @@ class TestRestore:
         v.assign("PERSON", "田中")
         assert v.restore("<PERSON_1>と<UNKNOWN_1>") == "田中と<UNKNOWN_1>"
 
+    def test_excluded_type_の番号なし_placeholder_は素通し(self) -> None:
+        # MY_NUMBER は assign で None を返し対応表に残らない。
+        # excluded type は <TYPE>（番号なし）形式でマスクされるが、placeholder
+        # 形式 <TYPE_N> にはマッチしないので restore でも素通しになる。
+        v = InMemoryVault()
+        assert v.restore("マイナンバーは <MY_NUMBER>") == "マイナンバーは <MY_NUMBER>"
+
+    def test_別_vault_由来の_placeholder_は素通し(self) -> None:
+        # vault1 に登録した placeholder を vault2 で復元しようとしても
+        # silent corruption しない。
+        vault1 = InMemoryVault()
+        vault1.assign("PERSON", "田中")
+        vault2 = InMemoryVault()
+        # vault2 には田中の登録がないので、<PERSON_1> はそのまま残る
+        assert vault2.restore("<PERSON_1>さん") == "<PERSON_1>さん"
+
+    def test_テキストに偶然含まれる_placeholder_形式は素通し(self) -> None:
+        # ユーザーテキストに偶然 <PERSON_999> という文字列が含まれていても、
+        # vault に未登録なので素通しになる（silent corruption ゼロ確認）。
+        v = InMemoryVault()
+        v.assign("PERSON", "田中")
+        text = "コード内のサンプル <PERSON_999> と実データ <PERSON_1>"
+        assert v.restore(text) == "コード内のサンプル <PERSON_999> と実データ 田中"
+
     def test_番号が二桁以上でも誤置換しない(self) -> None:
         v = InMemoryVault()
         for i in range(1, 12):  # PERSON_1 ... PERSON_11

@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterable
 from typing import Protocol
+
+# Placeholder の正規表現。形式は ``<TYPE_N>``（TYPE は大文字スネーク、N は 1 以上の整数）。
+# restore で「登録済み placeholder のみ」を狙い撃ちするために使う。
+_PLACEHOLDER_PATTERN = re.compile(r"<[A-Z][A-Z_]*_\d+>")
 
 
 class Vault(Protocol):
@@ -70,12 +75,18 @@ class InMemoryVault:
         return self._placeholder_to_surface.get(placeholder)
 
     def restore(self, text: str) -> str:
-        # 長い placeholder から処理して部分一致による誤置換を防ぐ
-        result = text
-        for placeholder, surface in sorted(
-            self._placeholder_to_surface.items(),
-            key=lambda item: len(item[0]),
-            reverse=True,
-        ):
-            result = result.replace(placeholder, surface)
-        return result
+        """text 中の登録済み placeholder を元 surface に置換して返す。
+
+        ``<TYPE_N>`` 形式に一致するトークンのみを対象とし、その中で vault に
+        登録されているものだけを置換する。未登録 placeholder（別 vault 由来、
+        excluded type の番号なし ``<TYPE>``、偶然テキストに含まれた文字列等）は
+        素通しする。これにより:
+
+        - 二重マスクや別セッションの placeholder が混入しても誤復元しない
+        - ``<PERSON_1>`` が ``<PERSON_11>`` の部分一致になる誤置換を構造的に防ぐ
+        - 1 パスの O(n) 置換になり、登録数 m に対して O(m·n) → O(n) に改善
+        """
+        return _PLACEHOLDER_PATTERN.sub(
+            lambda m: self._placeholder_to_surface.get(m.group(), m.group()),
+            text,
+        )
