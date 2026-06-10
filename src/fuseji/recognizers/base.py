@@ -43,6 +43,14 @@ _HYPHEN_TRANSLATION = str.maketrans(
     }
 )
 
+# normalize() 用に digits + hyphens を 1 つの translate テーブルへマージ。
+# 両者のキーは disjoint（数字と記号）なので衝突なし。値は数字側が int、
+# ハイフン側が str（str.translate はどちらも受ける）。
+_NORMALIZE_TRANSLATION: dict[int, str | int] = {
+    **_DIGIT_TRANSLATION,
+    **_HYPHEN_TRANSLATION,
+}
+
 
 def normalize_digits(text: str) -> str:
     """全角数字（０-９）を半角に変換。文字数は維持される。"""
@@ -60,8 +68,8 @@ def normalize_hyphens(text: str) -> str:
 
 
 def normalize(text: str) -> str:
-    """数字とハイフンの両方を正規化。"""
-    return text.translate(_DIGIT_TRANSLATION).translate(_HYPHEN_TRANSLATION)
+    """数字とハイフンの両方を 1 パスで正規化。"""
+    return text.translate(_NORMALIZE_TRANSLATION)
 
 
 def default_recognizers() -> tuple[Recognizer, ...]:
