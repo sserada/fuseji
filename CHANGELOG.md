@@ -20,6 +20,9 @@
 
 ### Changed
 
+- ベンチマークの環境マーカーと CI 信頼性を改善（#92）:
+  - `tests/bench/conftest.py` を追加し、`pytest_benchmark_update_machine_info` フックで `fuseji_env_key`（例: `darwin-arm64` / `linux-x86_64`）を machine_info に埋め込む。baseline ファイル名に環境キーを含める運用を `tests/bench/README.md` で案内
+  - `tests/test_latency_regression.py` の閾値テストをデフォルトスキップに変更。`CI_PERF=1` を設定したジョブまたはローカル検証でのみ実行（通常 CI のノイズで偽陽性が起きやすかったため）
 - 軽微なコード品質改善をまとめて反映（#94）:
   - `MaskResult.mapping` のデフォルト値を `MappingProxyType({})` のシングルトンに変更。`field(default_factory=dict)` で毎回 mutable dict を生成するコストを排除
   - `server/app.py` の env 変数パース処理を共通ヘルパ `_positive_from_env` に集約（`_max_body_bytes_from_env` / `_timeout_seconds_from_env` の重複を吸収）
