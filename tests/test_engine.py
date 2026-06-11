@@ -4,9 +4,12 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
+import pytest
+
 from fuseji.engine import Masker, _resolve_overlaps
 from fuseji.strategies import Redact
 from fuseji.types import Entity
+from fuseji.vault import InMemoryVault
 
 from .conftest import make_entity as _entity
 
@@ -124,3 +127,33 @@ class TestMaskerMask:
         result = m.mask("メール a@b.com 電話 090-1234-5678 郵便〒123-4567")
         types = {e.type for e in result.entities}
         assert types == {"EMAIL", "JP_PHONE_NUMBER", "JP_POSTAL_CODE"}
+
+
+class TestVaultStrategyConflict:
+    def test_vault_と_strategy_同時指定で_UserWarning(self) -> None:
+        """vault が strategy より優先されることを警告で明示."""
+        with pytest.warns(UserWarning, match="vault を優先"):
+            Masker(strategy=Redact(), vault=InMemoryVault())
+
+    def test_vault_単独なら警告なし(self) -> None:
+        import warnings as warn_module
+
+        with warn_module.catch_warnings():
+            warn_module.simplefilter("error")  # warning を例外化
+            # 警告が出れば test fail
+            Masker(vault=InMemoryVault())
+
+    def test_strategy_単独なら警告なし(self) -> None:
+        import warnings as warn_module
+
+        with warn_module.catch_warnings():
+            warn_module.simplefilter("error")
+            Masker(strategy=Redact())
+
+    def test_警告が出ても_vault_の挙動が優先される(self) -> None:
+        with pytest.warns(UserWarning):
+            m = Masker(strategy=Redact(replacement="REDACTED"), vault=InMemoryVault())
+        result = m.mask("a@b.com")
+        # Redact ではなく VaultStrategy が動作する → <EMAIL_1> 形式
+        assert "<EMAIL_1>" in result.text
+        assert "REDACTED" not in result.text

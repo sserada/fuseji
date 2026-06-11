@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
@@ -31,7 +32,8 @@ class Masker:
         recognizers: 使用する認識器。`None` で v0.1 のデフォルトセット。
         ner: NER バックエンド（GiNZA 等）。`None` で NER 無効。
         strategy: マスキング戦略（Placeholder/Redact/Hash）。Vault 指定時は
-            `VaultStrategy` で自動的に置き換えられ、本引数は無視される。
+            `VaultStrategy` で自動的に置き換えられ、本引数は無視される
+            （両者を同時指定すると `UserWarning` が発行される）。
         threshold: このスコア未満のエンティティは除外する。recall 重視で 0.4。
         vault: 仮名化バウルト。指定時は `VaultStrategy(vault=vault)` が
             内部戦略として使われ、同一表層形は同一 placeholder。excluded type
@@ -81,6 +83,15 @@ class Masker:
         # vault があれば VaultStrategy で吸収し、戦略経路を単一化する。
         # strategy 引数は vault と排他（vault 優先、strategy 無視）。
         if vault is not None:
+            if strategy is not None:
+                warnings.warn(
+                    "Masker: strategy と vault が同時指定されました。"
+                    "vault を優先して strategy は無視されます。"
+                    "両者を明確に分離するには Masker(vault=...) または "
+                    "Masker(strategy=...) のいずれか一方のみ指定してください。",
+                    UserWarning,
+                    stacklevel=2,
+                )
             self._strategy: MaskStrategy = VaultStrategy(vault=vault)
         else:
             self._strategy = strategy if strategy is not None else Placeholder()
