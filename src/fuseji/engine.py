@@ -15,6 +15,11 @@ if TYPE_CHECKING:
     from .strategies import MaskStrategy
     from .vault import Vault
 
+# mask_json の再帰深度制限。深いネストでスタック消費を防ぐための fail-closed 値。
+DEFAULT_MAX_JSON_DEPTH: int = 100
+# 深度超過時に返す固定 placeholder。fail-closed として原データを返さない。
+_TOO_DEEP_PLACEHOLDER: str = "[fuseji: too deep]"
+
 
 class Masker:
     """fuseji の中核クラス。
@@ -39,6 +44,7 @@ class Masker:
         strategy: MaskStrategy | None = None,
         threshold: float = 0.4,
         vault: Vault | None = None,
+        max_json_depth: int = DEFAULT_MAX_JSON_DEPTH,
     ) -> None:
         self._recognizers: tuple[Recognizer, ...] = (
             tuple(recognizers) if recognizers is not None else default_recognizers()
@@ -47,6 +53,7 @@ class Masker:
         self._strategy: MaskStrategy = strategy if strategy is not None else Placeholder()
         self._threshold = threshold
         self._vault = vault
+        self._max_json_depth = max_json_depth
 
     def detect(self, text: str) -> tuple[Entity, ...]:
         """テキストから PII エンティティを検出し、threshold で絞り込んだ後、
@@ -77,15 +84,24 @@ class Masker:
         その他の型（int, float, bool, None など）は素通し。
 
         辞書のキーは PII を含まない前提で、値のみマスクする。
+
+        ネスト深度が `max_json_depth`（デフォルト 100）を超えた要素は
+        fail-closed で固定文字列 `"[fuseji: too deep]"` に置換される。
+        スタック消費や無限再帰由来の DoS を抑止する。
         """
+        return self._mask_value(data, depth=0)
+
+    def _mask_value(self, data: Any, *, depth: int) -> Any:
+        if depth > self._max_json_depth:
+            return _TOO_DEEP_PLACEHOLDER
         if isinstance(data, str):
             return self.mask(data).text
         if isinstance(data, dict):
-            return {k: self.mask_json(v) for k, v in data.items()}
+            return {k: self._mask_value(v, depth=depth + 1) for k, v in data.items()}
         if isinstance(data, list):
-            return [self.mask_json(v) for v in data]
+            return [self._mask_value(v, depth=depth + 1) for v in data]
         if isinstance(data, tuple):
-            return tuple(self.mask_json(v) for v in data)
+            return tuple(self._mask_value(v, depth=depth + 1) for v in data)
         return data
 
 

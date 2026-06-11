@@ -96,3 +96,17 @@ class TestOpenAPI:
         assert "/mask" in paths
         assert "/detect" in paths
         assert "/healthz" in paths
+
+
+class TestBodySizeLimit:
+    def test_デフォルト_1MB_未満は受け付ける(self, client: TestClient) -> None:
+        small = {"data": "a" * 100}
+        res = client.post("/mask", json=small)
+        assert res.status_code == 200
+
+    def test_デフォルト_1MB_超は_413(self, client: TestClient) -> None:
+        # Content-Length が 2MB を示すよう、十分大きな string を投げる
+        big = {"data": "a" * 2_000_000}
+        res = client.post("/mask", json=big)
+        assert res.status_code == 413
+        assert res.json()["detail"] == "payload too large"

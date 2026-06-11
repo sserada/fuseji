@@ -2,18 +2,65 @@
 
 from __future__ import annotations
 
+import os
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.types import ASGIApp
 
 from ..engine import Masker
+
+# デフォルトのリクエストボディサイズ上限（1 MB）。環境変数で上書き可能。
+DEFAULT_MAX_BODY_BYTES: int = 1_000_000
+_ENV_MAX_BODY = "FUSEJI_SERVER_MAX_BODY_BYTES"
+
+
+class BodySizeLimitMiddleware(BaseHTTPMiddleware):
+    """Content-Length が上限を超える要求を 413 で拒否するミドルウェア。
+
+    Content-Length ヘッダが付かない chunked エンコーディング等には対応しない
+    （reverse-proxy 側で別途制限すること）。
+    """
+
+    def __init__(self, app: ASGIApp, max_bytes: int) -> None:
+        super().__init__(app)
+        self._max_bytes = max_bytes
+
+    async def dispatch(self, request: Request, call_next: Any) -> Any:
+        cl = request.headers.get("content-length")
+        if cl is not None:
+            try:
+                if int(cl) > self._max_bytes:
+                    return JSONResponse(
+                        {"detail": "payload too large"},
+                        status_code=413,
+                    )
+            except ValueError:
+                # 不正な Content-Length は通常 starlette が 400 にする。素通し。
+                pass
+        return await call_next(request)
+
+
+def _max_body_bytes_from_env() -> int:
+    raw = os.environ.get(_ENV_MAX_BODY)
+    if raw is None:
+        return DEFAULT_MAX_BODY_BYTES
+    try:
+        value = int(raw)
+    except ValueError:
+        return DEFAULT_MAX_BODY_BYTES
+    return value if value > 0 else DEFAULT_MAX_BODY_BYTES
+
 
 app: FastAPI = FastAPI(
     title="fuseji",
     description="日本語特化の PII 検出・マスキングミドルウェア",
-    version="0.0.0",
+    version="0.1.0",
 )
+app.add_middleware(BodySizeLimitMiddleware, max_bytes=_max_body_bytes_from_env())
 
 # モジュールスコープの Masker インスタンス。v0.1 は単純化のためグローバルで保持する。
 _masker = Masker()

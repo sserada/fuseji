@@ -103,3 +103,19 @@ class TestMaskJson:
         result = m.mask_json(data)
         assert isinstance(result, tuple)
         assert "<EMAIL_1>" in result[0]
+
+    def test_深いネストは_too_deep_に_fail_closed(self) -> None:
+        # max_json_depth=3 に絞り、4 段以上は固定文字列に置換されることを確認
+        m = Masker(max_json_depth=3)
+        data: object = {"l1": {"l2": {"l3": {"l4": "a@b.com"}}}}
+        result = m.mask_json(data)
+        # l4 のネスト先が too-deep 置換される
+        assert "[fuseji: too deep]" in str(result)
+        # 元データの a@b.com は漏れない（fail-closed）
+        assert "a@b.com" not in str(result)
+
+    def test_深度制限内ならマスクされる(self) -> None:
+        m = Masker(max_json_depth=10)
+        data = {"l1": {"l2": {"l3": "a@b.com"}}}
+        result = m.mask_json(data)
+        assert "<EMAIL_1>" in result["l1"]["l2"]["l3"]
