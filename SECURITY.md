@@ -69,7 +69,7 @@ mask_fn = make_mask_fn()
 mask_fn("...")  # 例外時は "[fuseji: masking failed]"
 ```
 
-例外内容は WARNING ログに記録されます（ログ集約側で原データが PII を含まないよう注意してください）。
+**ログ漏洩の防止**: デフォルトでは例外型名のみログに記録され、traceback は出力しません。traceback には元の PII を含む文字列が刻まれることがあるためです。デバッグ目的でフル traceback が必要な場合のみ環境変数 `FUSEJI_LANGFUSE_LOG_TRACEBACK=1` を設定してください。
 
 #### 5. 認識器の境界
 
@@ -79,6 +79,31 @@ mask_fn("...")  # 例外時は "[fuseji: masking failed]"
 #### 6. 検出の確実性
 
 `MY_NUMBER` 認識器は **recall 優先** で、チェックディジット不一致でも `score=0.5` で検出します。デフォルト `threshold=0.4` のため、これらもマスク対象となります。これは番号法上「漏らさない」ことを最優先する設計です。
+
+#### 7. DoS / リソース消費の防止
+
+- **`mask_json` の再帰深度上限**: デフォルト 100 段。超過した場合は fail-closed で `"[fuseji: too deep]"` に置換され、原データは返らない。スタック溢れや無限再帰由来の DoS を抑止する（`Masker(max_json_depth=...)` で調整可能）
+- **FastAPI サーバーのボディサイズ上限**: デフォルト 1MB。Content-Length が超過する要求は 413 で拒否する。環境変数 `FUSEJI_SERVER_MAX_BODY_BYTES` で上書き可能
+- **`InMemoryVault.clear()`**: 長時間稼働中のメモリ無制限増加を防ぐため、明示的にクリアできる
+
+#### 8. Thread-safety と並行運用
+
+`InMemoryVault.assign` は内部 `threading.Lock` で保護されており、Uvicorn の thread pool で並行に呼ばれてもカウンタ採番衝突や同一 (type, surface) への重複 placeholder 発行は起きません。`get` / `restore` は dict 読み取りのみで GIL に守られるため lock 不要です。
+
+#### 9. 例外階層
+
+fuseji 由来の例外は `FusejiError` を基底とする階層（`InvalidEntityError` / `InvalidConfigError`）に集約されています。
+
+```python
+from fuseji import FusejiError
+try:
+    masker.mask(...)
+except FusejiError:
+    # fuseji 由来のみキャッチ
+    ...
+```
+
+`InvalidEntityError` などは `ValueError` も多重継承しているため、既存の `except ValueError` も従来通り動作します。
 
 ### 利用者側の責任範囲
 
