@@ -62,6 +62,26 @@ class TestResolveOverlaps:
         result = _resolve_overlaps(es)
         assert [e.start for e in result] == [0, 10, 20]
 
+    def test_disjoint_な大量入力でも正しく全採用(self) -> None:
+        # #95 の max_end_so_far 早期採用パスを通すテスト。
+        # 100 個の disjoint span を投入し、全て採用されることを確認。
+        es = [_entity("X", "s", i * 10, i * 10 + 5, score=0.5 + 0.001 * i) for i in range(100)]
+        result = _resolve_overlaps(es)
+        assert len(result) == 100
+
+    def test_dense_な重複でも_max_end_の早期採用と協調する(self) -> None:
+        # スコア降順で 1 番目に採用される長い span が max_end を底上げするが、
+        # その後の重複候補は線形スキャン経路で正しく排除されることを確認。
+        es = [
+            _entity("A", "long", 0, 100, score=0.9),  # 最初に採用、max_end=100
+            _entity("B", "mid", 10, 30, score=0.8),  # 重複 → 拒否
+            _entity("C", "mid", 40, 60, score=0.8),  # 重複 → 拒否
+            _entity("D", "far", 200, 210, score=0.7),  # disjoint → 早期採用
+        ]
+        result = _resolve_overlaps(es)
+        types = {e.type for e in result}
+        assert types == {"A", "D"}
+
 
 class TestMaskerDetect:
     def test_デフォルト認識器セットを使用(self) -> None:
