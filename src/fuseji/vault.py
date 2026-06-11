@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import threading
 from collections.abc import Iterable
 from typing import Protocol
 
@@ -41,6 +42,13 @@ class InMemoryVault:
     - placeholder 形式は ``<TYPE_N>``（N は type ごとに 1 から付番）。
     - `excluded_types` に含まれる type は `assign` で None を返し、対応表に
       残さない。デフォルトは ``MY_NUMBER``（番号法対応で復元を許さない）。
+
+    Thread-safety:
+        `assign` は内部 `threading.Lock` で保護されている。Uvicorn の
+        thread pool 経由で並行に呼び出されてもカウンタ採番衝突や同一
+        (type, surface) への重複 placeholder 発行は起きない。
+        `get` / `restore` は dict 読み取りのみで CPython の GIL に守られる
+        ため lock 不要。
     """
 
     #: 復元を許さないデフォルトの type 集合（番号法対応）
@@ -53,6 +61,7 @@ class InMemoryVault:
         self._counters: dict[str, int] = {}
         self._surface_to_placeholder: dict[tuple[str, str], str] = {}
         self._placeholder_to_surface: dict[str, str] = {}
+        self._lock = threading.Lock()
 
     @property
     def excluded_types(self) -> frozenset[str]:
@@ -62,14 +71,21 @@ class InMemoryVault:
         if entity_type in self._excluded:
             return None
         key = (entity_type, surface)
+        # Lock の外で先読みする fast-path で、既存 placeholder のときは
+        # ロック取得を回避できる（dict.get は atomic）。
         cached = self._surface_to_placeholder.get(key)
         if cached is not None:
             return cached
-        self._counters[entity_type] = self._counters.get(entity_type, 0) + 1
-        placeholder = f"<{entity_type}_{self._counters[entity_type]}>"
-        self._surface_to_placeholder[key] = placeholder
-        self._placeholder_to_surface[placeholder] = surface
-        return placeholder
+        # 新規割当は競合を避けるためロック内で再チェック → 採番。
+        with self._lock:
+            cached = self._surface_to_placeholder.get(key)
+            if cached is not None:
+                return cached
+            self._counters[entity_type] = self._counters.get(entity_type, 0) + 1
+            placeholder = f"<{entity_type}_{self._counters[entity_type]}>"
+            self._surface_to_placeholder[key] = placeholder
+            self._placeholder_to_surface[placeholder] = surface
+            return placeholder
 
     def get(self, placeholder: str) -> str | None:
         return self._placeholder_to_surface.get(placeholder)
