@@ -135,6 +135,57 @@ class TestRestore:
         assert v.restore("<PERSON_1>") == "<PERSON_1>"
 
 
+class TestThreadSafety:
+    def test_並行_assign_でも採番衝突しない(self) -> None:
+        """複数スレッドで同じ surface を assign しても placeholder は 1 つに収束."""
+        import threading
+
+        v = InMemoryVault()
+        results: list[str | None] = []
+        results_lock = threading.Lock()
+
+        def worker() -> None:
+            ph = v.assign("PERSON", "田中")
+            with results_lock:
+                results.append(ph)
+
+        threads = [threading.Thread(target=worker) for _ in range(50)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        # 全スレッドが同じ placeholder を取得
+        assert len(set(results)) == 1
+        # カウンタは 1 つだけ進んだ
+        assert v.assign("PERSON", "別人") == "<PERSON_2>"
+
+    def test_異なる_surface_の並行_assign_で番号が重複しない(self) -> None:
+        """異なる surface を並行 assign しても番号がユニーク."""
+        import threading
+
+        v = InMemoryVault()
+        surfaces = [f"name_{i}" for i in range(100)]
+        results: dict[str, str | None] = {}
+        results_lock = threading.Lock()
+
+        def worker(surface: str) -> None:
+            ph = v.assign("PERSON", surface)
+            with results_lock:
+                results[surface] = ph
+
+        threads = [threading.Thread(target=worker, args=(s,)) for s in surfaces]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        # 全 surface に placeholder が割り当てられ、すべてユニーク
+        assert len(results) == 100
+        placeholders = list(results.values())
+        assert len(set(placeholders)) == 100
+
+
 class TestVaultProtocol:
     """InMemoryVault が Vault プロトコルを満たすことの確認."""
 

@@ -21,6 +21,10 @@ def test_replace_spans_scales(benchmark: Any, k: int) -> None:
     text = "a" * 1024
     # 等間隔に k 個の span を配置（オーバーラップなし）
     step = max(1, len(text) // (k + 1))
-    replacements = [(i * step, i * step + 1, "<X>") for i in range(1, k + 1) if i * step + 1 < len(text)]
+    replacements = [
+        (i * step, i * step + 1, "<X>")
+        for i in range(1, k + 1)
+        if i * step + 1 < len(text)
+    ]
     benchmark.group = "replace_spans"
     benchmark(_replace_spans, text, replacements)
