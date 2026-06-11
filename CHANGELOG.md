@@ -5,6 +5,31 @@
 
 ## [Unreleased]
 
+post-0.1.0 の改善（次のマイナーリリースに含める想定）。
+
+### Added
+
+- **`VaultStrategy`**: `MaskStrategy` プロトコルの実装として `Vault` を吸収する戦略を導入。`Masker(vault=...)` 指定時は内部で自動的に組み立てられ、戦略経路が単一化される。直接 import 可能（`from fuseji import VaultStrategy`）
+- **`FusejiError` 例外階層**: `FusejiError`（基底）と `InvalidEntityError` / `InvalidConfigError`。多重継承で `ValueError` も継承するため `except ValueError` の既存コードは変更不要
+- **公開 API の docstring に Example セクション** を追加（`Masker.mask` / `detect` / `mask_json`、`Placeholder` / `Redact` / `Hash`、`InMemoryVault`、`make_mask_fn`）。doctest として実行可能
+- **`Masker(max_json_depth=...)`** で `mask_json` の再帰深度上限を制御可能（既定 100）。超過時は fail-closed で `"[fuseji: too deep]"` に置換
+- **`fuseji.server.app.create_app(masker=..., max_body_bytes=...)`** factory を導入。カスタム認識器・Vault・NER を統合した Masker をサーバーに注入可能
+- **FastAPI サーバーに `BodySizeLimitMiddleware`**: Content-Length が上限（既定 1MB、`FUSEJI_SERVER_MAX_BODY_BYTES` で上書き可）を超える要求を 413 で拒否
+- **fuseji-bench**: `pytest-benchmark` 基盤と 23 ベンチケース（masker / replace_spans / recognizers / vault）。`tests/bench/` 配下。CI に bench ジョブを追加（informational）
+- **レイテンシ回帰検知テスト** `tests/test_latency_regression.py`: 通常 pytest で実行され、O(n²) バグ等の性能回帰を即時 fail させる
+- **認識器の共通ヘルパ** `recognizers/base.py` に `SEPARATOR_PATTERN` と `has_digit_boundary()` を抽出
+- **テスト共通ヘルパ** `tests/conftest.py` で `make_entity` を集約（旧 `_entity` のヘルパ重複を解消）
+
+### Changed
+
+- **`InMemoryVault.assign`** を `threading.Lock` で保護（double-checked locking パターン）。Uvicorn の thread pool 経由でも並行採番衝突なし
+- **Langfuse adapter のログ出力**: デフォルトで例外型名のみ（traceback なし）。トレースバック中の PII 漏洩を防ぐ。デバッグ用 escape hatch として `FUSEJI_LANGFUSE_LOG_TRACEBACK=1` 環境変数で従来の `logger.exception` 動作に戻せる
+
+### Documentation
+
+- **examples/**: Langfuse SDK / ingestion callback / OTel / GiNZA の 4 種類のサンプル
+- **docs/design.md / docs/api.md**: 設計ドキュメントの公開部分と API リファレンス
+
 ## [0.1.0] - 2026-06-11
 
 初回リリース。日本語特化の PII 検出・マスキングミドルウェア。
