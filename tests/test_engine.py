@@ -15,13 +15,15 @@ from .conftest import make_entity as _entity
 
 
 class _StubRecognizer:
-    """テスト用のスタブ認識器."""
+    """テスト用のスタブ認識器。v0.2 Protocol 準拠（normalized kwarg を受け取る）。"""
 
     def __init__(self, entity_type: str, entities: list[Entity]) -> None:
         self.entity_type = entity_type
+        self.name = entity_type.lower()
         self._entities = entities
 
-    def analyze(self, text: str) -> Iterable[Entity]:
+    def analyze(self, text: str, *, normalized: str | None = None) -> Iterable[Entity]:
+        del normalized
         return iter(self._entities)
 
 
@@ -130,7 +132,7 @@ class TestMaskerMask:
 
 
 class TestNormalizedDispatch:
-    """Masker が事前正規化済みテキストを認識器に渡す挙動 (#24)."""
+    """Masker が事前正規化済みテキストを認識器に渡す挙動 (#24 + #93)."""
 
     def test_normalized_kwarg_を受ける認識器に渡される(self) -> None:
         # normalized を観測する認識器
@@ -149,34 +151,18 @@ class TestNormalizedDispatch:
         # normalize(text) = "090-1234"（数字＋ハイフン正規化）が渡る
         assert observed["normalized"] == "090-1234"
 
-    def test_kwarg_未対応の認識器には_text_のみで呼ばれる(self) -> None:
-        called_with: dict[str, object] = {}
-
-        class LegacyRecognizer:
-            entity_type = "Y"
-            name = "y"
-
-            def analyze(self, text: str) -> Iterable[Entity]:
-                called_with["text"] = text
-                called_with["has_kwarg"] = False
-                return iter([])
-
-        m = Masker(recognizers=[LegacyRecognizer()])
-        m.detect("テストテキスト")
-        assert called_with["text"] == "テストテキスト"
-        # kwarg 未対応認識器のみの場合、normalize 計算自体スキップされる
-        assert not m._accepts_normalized[0]
-
-    def test_全認識器が_kwarg_未対応なら_normalize_を計算しない(
+    def test_normalize_は_detect_ごとに_1_回だけ呼ばれる(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         import fuseji.engine
 
-        class LegacyRecognizer:
+        class CountingRecognizer:
             entity_type = "Z"
             name = "z"
 
-            def analyze(self, text: str) -> Iterable[Entity]:
+            def analyze(self, text: str, *, normalized: str | None = None) -> Iterable[Entity]:
+                # normalized を確実に受け取って消費（重複正規化が起きないことを確認）
+                _ = normalized
                 return iter([])
 
         calls = {"count": 0}
@@ -187,9 +173,10 @@ class TestNormalizedDispatch:
             return original_normalize(t)
 
         monkeypatch.setattr(fuseji.engine, "normalize", counting)
-        m = Masker(recognizers=[LegacyRecognizer()])
+        # 認識器を 3 つ登録しても normalize は 1 回だけ呼ばれる
+        m = Masker(recognizers=[CountingRecognizer(), CountingRecognizer(), CountingRecognizer()])
         m.detect("テスト")
-        assert calls["count"] == 0
+        assert calls["count"] == 1
 
     def test_デフォルト認識器でも検出結果が従来と同じ(self) -> None:
         # 既存挙動の互換性確認
@@ -198,7 +185,7 @@ class TestNormalizedDispatch:
         types = {e.type for e in result}
         assert types == {"EMAIL", "JP_PHONE_NUMBER", "JP_POSTAL_CODE"}
 
-    def test_VAR_KEYWORD_も_normalized_対応とみなす(self) -> None:
+    def test_VAR_KEYWORD_を受ける認識器にも_normalized_が渡る(self) -> None:
         captured: dict[str, object] = {}
 
         class KwargsRecognizer:
@@ -213,6 +200,20 @@ class TestNormalizedDispatch:
         m.detect("０９０")
         assert "normalized" in captured
         assert captured["normalized"] == "090"
+
+    def test_normalized_kwarg_を受けない認識器は_TypeError(self) -> None:
+        # v0.2 以降、Recognizer.analyze は normalized kwarg を受け取る必要がある。
+        # 後方互換のための inspect ベース dispatch は廃止された。
+        class NonCompliantRecognizer:
+            entity_type = "Q"
+            name = "q"
+
+            def analyze(self, text: str) -> Iterable[Entity]:
+                return iter([])
+
+        m = Masker(recognizers=[NonCompliantRecognizer()])
+        with pytest.raises(TypeError):
+            m.detect("テスト")
 
 
 class TestCrossRecognizerOverlap:

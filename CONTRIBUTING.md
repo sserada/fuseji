@@ -46,8 +46,14 @@ uv run pytest                    # テスト
 class Recognizer(Protocol):
     entity_type: str  # 種別名（例: "ZIP_CODE_US"）
     name: str         # 認識器の識別子（snake_case）。Entity.recognizer に格納
-    def analyze(self, text: str) -> Iterable[Entity]: ...
+    def analyze(
+        self, text: str, *, normalized: str | None = None
+    ) -> Iterable[Entity]: ...
 ```
+
+`normalized` は Masker 層で事前計算された `normalize(text)` の結果。正規化を
+必要としない認識器は引数を受け取るだけで無視してよい（`del normalized` でリンタ
+の `unused-argument` 警告を回避できる）。
 
 regex + 任意の検証ロジックで完結する認識器は、`regex_analyze` 共通テンプレートを
 使うとボイラープレートを大幅に削減できます：

@@ -60,8 +60,9 @@ class TestMakeMaskFn:
     def test_例外時は_fail_closed_な_placeholder(self, caplog: pytest.LogCaptureFixture) -> None:
         class _BrokenRecognizer:
             entity_type = "BROKEN"
+            name = "broken"
 
-            def analyze(self, text: str) -> Iterable[Entity]:
+            def analyze(self, text: str, *, normalized: str | None = None) -> Iterable[Entity]:
                 raise RuntimeError("壊れた認識器")
 
         m = Masker(recognizers=[_BrokenRecognizer()])
@@ -78,8 +79,9 @@ class TestMakeMaskFn:
         # PII 漏洩防止: 例外時は固定 placeholder で、原データは返らない
         class _BrokenRecognizer:
             entity_type = "BROKEN"
+            name = "broken"
 
-            def analyze(self, text: str) -> Iterable[Entity]:
+            def analyze(self, text: str, *, normalized: str | None = None) -> Iterable[Entity]:
                 raise RuntimeError("壊れた認識器")
 
         m = Masker(recognizers=[_BrokenRecognizer()])
@@ -95,8 +97,9 @@ class TestMakeMaskFn:
         # 例外型名のみログし、traceback はログしない。
         class _BrokenRecognizer:
             entity_type = "BROKEN"
+            name = "broken"
 
-            def analyze(self, text: str) -> Iterable[Entity]:
+            def analyze(self, text: str, *, normalized: str | None = None) -> Iterable[Entity]:
                 # メッセージに PII を含むケースを想定
                 raise RuntimeError("token=secret@example.com")
 
@@ -123,8 +126,9 @@ class TestMakeMaskFn:
 
         class _BrokenRecognizer:
             entity_type = "BROKEN"
+            name = "broken"
 
-            def analyze(self, text: str) -> Iterable[Entity]:
+            def analyze(self, text: str, *, normalized: str | None = None) -> Iterable[Entity]:
                 raise RuntimeError("with traceback")
 
         m = Masker(recognizers=[_BrokenRecognizer()])

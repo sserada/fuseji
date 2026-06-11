@@ -5,6 +5,12 @@
 
 ## [Unreleased]
 
+### Breaking Changes
+
+- `Recognizer` プロトコルの `analyze` シグネチャが `analyze(self, text: str, *, normalized: str | None = None) -> Iterable[Entity]` に変更。`normalized` kwarg を受け取らないカスタム認識器は v0.2 以降で `TypeError` になる（#93）
+  - Masker 内部の `inspect.signature` ベース dispatch（`_accepts_normalized_kwarg`）を廃止し、code path がシンプルに
+  - 移行方法: 既存の `def analyze(self, text)` に `*, normalized=None` を追加するだけ。`normalized` を使わない認識器は引数を無視してよい
+
 ### Added
 
 - `Recognizer` プロトコルに `name` 属性（snake_case 識別子、`Entity.recognizer` に格納）を追加
