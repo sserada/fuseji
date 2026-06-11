@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable
 
+from ..entity_types import CREDIT_CARD
 from ..types import Entity
 from .base import SEPARATOR_PATTERN, normalize
 
@@ -33,7 +34,7 @@ class CreditCardRecognizer:
     Luhn 失敗は credit card ではないことが確実なので除外する（偽陽性抑制）。
     """
 
-    entity_type = "CREDIT_CARD"
+    entity_type = CREDIT_CARD
 
     def analyze(self, text: str) -> Iterable[Entity]:
         # 全角数字・全角ハイフンを正規化（1 文字 ↔ 1 文字なのでオフセット維持）

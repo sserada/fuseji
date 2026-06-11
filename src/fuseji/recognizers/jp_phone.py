@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable
 
+from ..entity_types import JP_PHONE_NUMBER
 from ..types import Entity
 from .base import SEPARATOR_PATTERN, has_digit_boundary, normalize
 
@@ -41,7 +42,7 @@ class JpPhoneRecognizer:
     偽陽性を抑制する。
     """
 
-    entity_type = "JP_PHONE_NUMBER"
+    entity_type = JP_PHONE_NUMBER
 
     def analyze(self, text: str) -> Iterable[Entity]:
         normalized = normalize(text)

@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable
 
+from ..entity_types import MY_NUMBER
 from ..types import Entity
 from .base import has_digit_boundary, normalize_digits
 
@@ -43,7 +44,7 @@ class MyNumberRecognizer:
     法的リスクを踏まえ、recall を優先して pattern-only でも検出する。
     """
 
-    entity_type = "MY_NUMBER"
+    entity_type = MY_NUMBER
 
     def analyze(self, text: str) -> Iterable[Entity]:
         normalized = normalize_digits(text)
