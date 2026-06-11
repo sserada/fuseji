@@ -74,6 +74,11 @@
 
 ### Performance
 
+- `_resolve_overlaps` に `max_end_so_far` 早期採用パスを追加（#95）:
+  - 候補の `start` が採用済みの最大 `end` 以上のとき、線形スキャンせず O(1) で即採用
+  - 完全に重ならない入力（典型的な fuseji 利用）では全体が O(n log n) に近づく
+  - 密な重複入力では従来の O(n²) フォールバックが走る
+  - true sweep-line / interval tree の実装は worst case を改善する follow-up として残す
 - `Masker.detect` が `normalize(text)` を 1 回だけ計算し、対応する認識器に
   事前正規化済みテキストを渡すよう改良。デフォルト 5 認識器構成で従来は
   4 回呼ばれていた `str.translate` フルスキャンが 1 回に削減される。

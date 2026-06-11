@@ -202,13 +202,29 @@ def _resolve_overlaps(entities: Sequence[Entity]) -> list[Entity]:
     優先順位: スコア降順 → 長い span 優先 → 開始位置昇順。
     採用済み span と重ならないものから順に採用し、最後に元テキスト位置順で
     並べ直して返す。
+
+    最適化 (#95): `max_end_so_far` を追跡し、候補の start が採用済みの最大
+    end 以上のときは線形スキャンせず即採用する（disjoint case の O(1) 早期
+    採用）。完全に重ならない入力では全体が O(n log n) に近づく。密な重複
+    入力では従来通り O(n²) のフォールバック。
     """
     ordered = sorted(entities, key=lambda e: (-e.score, -(e.end - e.start), e.start))
     accepted: list[Entity] = []
     spans: list[tuple[int, int]] = []
+    max_end_so_far = -1
     for e in ordered:
+        if e.start >= max_end_so_far:
+            # 採用済み span のいずれとも重ならないことが O(1) で確定。
+            accepted.append(e)
+            spans.append((e.start, e.end))
+            if e.end > max_end_so_far:
+                max_end_so_far = e.end
+            continue
+        # 重なる可能性あり: 線形スキャンで競合を確認
         if any(not (e.end <= s or e.start >= ee) for s, ee in spans):
             continue
         accepted.append(e)
         spans.append((e.start, e.end))
+        if e.end > max_end_so_far:
+            max_end_so_far = e.end
     return sorted(accepted, key=lambda e: e.start)
