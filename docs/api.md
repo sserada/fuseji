@@ -129,10 +129,16 @@ class Redact:
 ```python
 @dataclass(frozen=True, slots=True)
 class Hash:
-    length: int = 8  # 1-64 の範囲
+    length: int = 16          # 1-64 の範囲、デフォルト 16 (64bit)
+    keep_mapping: bool = False  # True で {hash: 元 surface} を返す（デフォルトは空）
 ```
 
-SHA256 ハッシュ hex の先頭 N 文字で置換。同一表層形は同一ハッシュ。`mapping` には `hash → 元 surface` を保持（既知集合からの逆引きは可能）。
+SHA256 ハッシュ hex の先頭 N 文字で置換。同一表層形は同一ハッシュ。
+
+**セキュリティ（v0.2 以降）**:
+- デフォルト `length=16` でレインボー攻撃耐性を強化（v0.1 は 8）
+- `mapping` はデフォルトで空 dict。`keep_mapping=True` を明示指定したときのみ `{hash: 元 surface}` を返す
+- 戻り値 `mapping` を経由した PII 漏洩経路を遮断する
 
 > ⚠️ `Hash` という名前は Python ビルトインの `hash()` 関数と紛らわしいことがあります。混在環境では `from fuseji import Hash as HashStrategy` のエイリアス import を検討してください。
 

@@ -130,16 +130,26 @@ class Hash:
     """SHA256 ハッシュの先頭 N 文字（hex）で置換する戦略。
 
     同一表層形は同一ハッシュとなり、ログ上で分析しつつ原文は伏せられる。
-    対応表は hash → 元テキストを持つ（一方向だが既知集合からの逆引きは可能）。
+
+    **セキュリティ**:
+    - `length` のデフォルトは 16 文字 (64bit)。8 以下は低エントロピー PII
+      （email/電話番号）に対するレインボー攻撃で完全逆引きされうるため非推奨。
+    - 戻り値 `mapping` はデフォルトで **空 dict**。`keep_mapping=True` を
+      明示的に指定したときのみ `{hash: 元 surface}` を返す。
+      v0.1 のデフォルト挙動（mapping に逆引きテーブル）は PII 漏洩経路
+      になりうるため v0.2 で破壊的変更（#82）。
 
     Example:
         >>> from fuseji import Masker, Hash
         >>> result = Masker(strategy=Hash(length=8)).mask("a@b.com")
         >>> len(result.text)  # 8 文字のハッシュ
         8
+        >>> result.mapping  # デフォルトは空（PII を残さない）
+        {}
     """
 
-    length: int = 8
+    length: int = 16
+    keep_mapping: bool = False
 
     def __post_init__(self) -> None:
         if not 1 <= self.length <= 64:
@@ -154,5 +164,7 @@ class Hash:
 
         replacements = [(e.start, e.end, surface_to_hash[e.text]) for e in entities]
         masked = _replace_spans(text, replacements)
-        mapping = {h: surface for surface, h in surface_to_hash.items()}
+        mapping: dict[str, str] = (
+            {h: surface for surface, h in surface_to_hash.items()} if self.keep_mapping else {}
+        )
         return masked, mapping

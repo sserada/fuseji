@@ -103,9 +103,19 @@ class TestRedact:
 
 class TestHash:
     def test_単一エンティティ(self) -> None:
+        # length=8 を明示してハッシュ長を固定
         text = "電話は 090-1234-5678 まで"
         entities = [_entity("JP_PHONE", "090-1234-5678", 4, 17)]
         masked, mapping = Hash(length=8).mask(text, entities)
+        expected = hashlib.sha256(b"090-1234-5678").hexdigest()[:8]
+        assert masked == f"電話は {expected} まで"
+        # デフォルトは keep_mapping=False で空 mapping
+        assert mapping == {}
+
+    def test_keep_mapping_True_で_hash_to_surface_を返す(self) -> None:
+        text = "電話は 090-1234-5678 まで"
+        entities = [_entity("JP_PHONE", "090-1234-5678", 4, 17)]
+        masked, mapping = Hash(length=8, keep_mapping=True).mask(text, entities)
         expected = hashlib.sha256(b"090-1234-5678").hexdigest()[:8]
         assert masked == f"電話は {expected} まで"
         assert mapping == {expected: "090-1234-5678"}
@@ -113,7 +123,8 @@ class TestHash:
     def test_同一表層形_は同一ハッシュ(self) -> None:
         text = "田中田中"
         entities = [_entity("PERSON", "田中", 0, 2), _entity("PERSON", "田中", 2, 4)]
-        masked, mapping = Hash().mask(text, entities)
+        # keep_mapping=True で mapping 内容を検証
+        masked, mapping = Hash(length=8, keep_mapping=True).mask(text, entities)
         expected = hashlib.sha256("田中".encode()).hexdigest()[:8]
         assert masked == f"{expected}{expected}"
         assert mapping == {expected: "田中"}
@@ -121,7 +132,7 @@ class TestHash:
     def test_異なる表層形_は異なるハッシュ(self) -> None:
         text = "田中佐藤"
         entities = [_entity("PERSON", "田中", 0, 2), _entity("PERSON", "佐藤", 2, 4)]
-        _, mapping = Hash().mask(text, entities)
+        _, mapping = Hash(keep_mapping=True).mask(text, entities)
         assert len(mapping) == 2
         assert "田中" in mapping.values()
         assert "佐藤" in mapping.values()
@@ -133,12 +144,18 @@ class TestHash:
         m2, _ = Hash().mask(text, entities)
         assert m1 == m2
 
+    def test_デフォルト_length_は_16(self) -> None:
+        text = "x@y.z"
+        entities = [_entity("EMAIL", "x@y.z", 0, 5)]
+        masked, _ = Hash().mask(text, entities)
+        # マスク後の長さ = デフォルト長 16（v0.2 でレインボー攻撃耐性を強化）
+        assert len(masked) == 16
+
     def test_length_指定(self) -> None:
         text = "x@y.z"
         entities = [_entity("EMAIL", "x@y.z", 0, 5)]
-        masked, _ = Hash(length=16).mask(text, entities)
-        # マスク後の長さ = ハッシュ長
-        assert len(masked) == 16
+        masked, _ = Hash(length=32).mask(text, entities)
+        assert len(masked) == 32
 
     @pytest.mark.parametrize("length", [0, -1, 65, 100])
     def test_length_範囲外は拒否(self, length: int) -> None:
@@ -149,3 +166,14 @@ class TestHash:
         masked, mapping = Hash().mask("そのまま", [])
         assert masked == "そのまま"
         assert mapping == {}
+
+    def test_デフォルトは_mapping_に_PII_が含まれない(self) -> None:
+        # v0.2 セキュリティ既定: PII surface は mapping に残さない
+        text = "メール taro@example.com"
+        entities = [_entity("EMAIL", "taro@example.com", 4, 20)]
+        _, mapping = Hash().mask(text, entities)
+        assert mapping == {}
+        # surface が mapping のどこにも残っていないことを念のため確認
+        for v in mapping.values():
+            assert "taro" not in v
+            assert "example" not in v
