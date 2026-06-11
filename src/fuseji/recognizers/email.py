@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable
 
+from ..entity_types import EMAIL
 from ..types import Entity
 
 # RFC 5322 完全準拠ではないが、実用上 99% のアドレスを拾える簡易パターン。
@@ -16,7 +17,7 @@ _EMAIL_PATTERN = re.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")
 class EmailRecognizer:
     """メールアドレス認識器。"""
 
-    entity_type = "EMAIL"
+    entity_type = EMAIL
 
     def analyze(self, text: str) -> Iterable[Entity]:
         for m in _EMAIL_PATTERN.finditer(text):

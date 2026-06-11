@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable
 
+from ..entity_types import JP_POSTAL_CODE
 from ..types import Entity
 from .base import has_digit_boundary, normalize
 
@@ -34,7 +35,7 @@ class JpPostalRecognizer:
     区切りなしの 7 桁数字は日付・ID 等との誤検出が多いため検出しない。
     """
 
-    entity_type = "JP_POSTAL_CODE"
+    entity_type = JP_POSTAL_CODE
 
     def analyze(self, text: str) -> Iterable[Entity]:
         normalized = normalize(text)

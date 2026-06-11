@@ -7,6 +7,8 @@ import threading
 from collections.abc import Iterable
 from typing import Protocol
 
+from . import entity_types
+
 # Placeholder の正規表現。形式は ``<TYPE_N>``（TYPE は大文字スネーク、N は 1 以上の整数）。
 # restore で「登録済み placeholder のみ」を狙い撃ちするために使う。
 _PLACEHOLDER_PATTERN = re.compile(r"<[A-Z][A-Z_]*_\d+>")
@@ -63,7 +65,7 @@ class InMemoryVault:
     """
 
     #: 復元を許さないデフォルトの type 集合（番号法対応）
-    DEFAULT_EXCLUDED_TYPES: frozenset[str] = frozenset({"MY_NUMBER"})
+    DEFAULT_EXCLUDED_TYPES: frozenset[str] = frozenset({entity_types.MY_NUMBER})
 
     def __init__(self, excluded_types: Iterable[str] | None = None) -> None:
         self._excluded: frozenset[str] = (
