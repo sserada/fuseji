@@ -110,3 +110,40 @@ class TestBodySizeLimit:
         res = client.post("/mask", json=big)
         assert res.status_code == 413
         assert res.json()["detail"] == "payload too large"
+
+
+class TestCreateAppFactory:
+    def test_create_app_でカスタム_masker_を注入できる(self) -> None:
+        """create_app(masker=...) で DI が機能することを確認."""
+        from fuseji import Masker
+        from fuseji.server.app import create_app
+
+        # threshold を極端に高くして何も検出しない Masker を作る
+        custom = Masker(threshold=1.5)
+        custom_app = create_app(masker=custom)
+        c = TestClient(custom_app)
+        res = c.post("/mask", json={"data": "a@b.com"})
+        assert res.status_code == 200
+        # カスタム Masker が使われ、EMAIL は検出されずに素通し
+        assert res.json()["data"] == "a@b.com"
+
+    def test_create_app_でカスタム_max_body_bytes_を指定できる(self) -> None:
+        from fuseji.server.app import create_app
+
+        # 100 バイト上限の小さな app を作る
+        small_app = create_app(max_body_bytes=100)
+        c = TestClient(small_app)
+        big = {"data": "a" * 1000}
+        res = c.post("/mask", json=big)
+        assert res.status_code == 413
+
+    def test_モジュールスコープ_app_は_create_app_と独立(self) -> None:
+        """既定の `app` モジュール変数も後方互換で動作する."""
+        from fuseji.server.app import app, create_app
+
+        custom_app = create_app()
+        # 異なるインスタンスだが同じ動作
+        assert app is not custom_app
+        c1 = TestClient(app)
+        c2 = TestClient(custom_app)
+        assert c1.get("/healthz").json() == c2.get("/healthz").json() == {"status": "ok"}

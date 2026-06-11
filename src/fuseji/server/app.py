@@ -55,17 +55,6 @@ def _max_body_bytes_from_env() -> int:
     return value if value > 0 else DEFAULT_MAX_BODY_BYTES
 
 
-app: FastAPI = FastAPI(
-    title="fuseji",
-    description="日本語特化の PII 検出・マスキングミドルウェア",
-    version="0.1.0",
-)
-app.add_middleware(BodySizeLimitMiddleware, max_bytes=_max_body_bytes_from_env())
-
-# モジュールスコープの Masker インスタンス。v0.1 は単純化のためグローバルで保持する。
-_masker = Masker()
-
-
 class MaskRequest(BaseModel):
     """`POST /mask` のリクエストボディ."""
 
@@ -107,32 +96,73 @@ class HealthResponse(BaseModel):
     status: str
 
 
-@app.post("/mask", response_model=MaskResponse)
-def mask_endpoint(req: MaskRequest) -> MaskResponse:
-    """JSON データを受け取り、マスク済みの同型データを返す。"""
-    return MaskResponse(data=_masker.mask_json(req.data))
+def create_app(
+    masker: Masker | None = None,
+    *,
+    max_body_bytes: int | None = None,
+) -> FastAPI:
+    """FastAPI アプリケーションを構築して返す（factory）。
 
+    Args:
+        masker: 使用する Masker インスタンス。`None` のとき新規に
+            `Masker()` を作る（v0.1 デフォルト認識器セット）。
+            カスタム認識器・Vault・NER を統合したい場合は明示的に渡す。
+        max_body_bytes: リクエストボディサイズ上限（バイト）。`None` のとき
+            環境変数 `FUSEJI_SERVER_MAX_BODY_BYTES` または既定 1MB。
 
-@app.post("/detect", response_model=DetectResponse)
-def detect_endpoint(req: DetectRequest) -> DetectResponse:
-    """テキストから PII を検出して entity 一覧を返す。"""
-    entities = _masker.detect(req.text)
-    return DetectResponse(
-        entities=[
-            EntityModel(
-                type=e.type,
-                text=e.text,
-                start=e.start,
-                end=e.end,
-                score=e.score,
-                recognizer=e.recognizer,
-            )
-            for e in entities
-        ]
+    Returns:
+        ルート登録済みの `FastAPI` インスタンス。
+
+    Example:
+        >>> from fuseji import Masker, InMemoryVault
+        >>> from fuseji.server.app import create_app
+        >>> # Vault を使う構成でデプロイ
+        >>> app = create_app(masker=Masker(vault=InMemoryVault()))
+    """
+    actual_masker: Masker = masker if masker is not None else Masker()
+    actual_max_body: int = (
+        max_body_bytes if max_body_bytes is not None else _max_body_bytes_from_env()
     )
 
+    new_app = FastAPI(
+        title="fuseji",
+        description="日本語特化の PII 検出・マスキングミドルウェア",
+        version="0.1.0",
+    )
+    new_app.add_middleware(BodySizeLimitMiddleware, max_bytes=actual_max_body)
 
-@app.get("/healthz", response_model=HealthResponse)
-def healthz() -> HealthResponse:
-    """ヘルスチェック。常に 200 OK を返す。"""
-    return HealthResponse(status="ok")
+    @new_app.post("/mask", response_model=MaskResponse)
+    def mask_endpoint(req: MaskRequest) -> MaskResponse:
+        """JSON データを受け取り、マスク済みの同型データを返す。"""
+        return MaskResponse(data=actual_masker.mask_json(req.data))
+
+    @new_app.post("/detect", response_model=DetectResponse)
+    def detect_endpoint(req: DetectRequest) -> DetectResponse:
+        """テキストから PII を検出して entity 一覧を返す。"""
+        entities = actual_masker.detect(req.text)
+        return DetectResponse(
+            entities=[
+                EntityModel(
+                    type=e.type,
+                    text=e.text,
+                    start=e.start,
+                    end=e.end,
+                    score=e.score,
+                    recognizer=e.recognizer,
+                )
+                for e in entities
+            ]
+        )
+
+    @new_app.get("/healthz", response_model=HealthResponse)
+    def healthz() -> HealthResponse:
+        """ヘルスチェック。常に 200 OK を返す。"""
+        return HealthResponse(status="ok")
+
+    return new_app
+
+
+# モジュールスコープの app は既定構成（環境変数からの max_body_bytes、新規 Masker）。
+# `uvicorn fuseji.server.app:app` で起動する既存利用との後方互換のため残す。
+# カスタム構成が必要なときは create_app(...) を呼んで自前で起動する。
+app: FastAPI = create_app()
