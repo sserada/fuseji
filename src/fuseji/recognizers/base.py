@@ -1,11 +1,16 @@
-"""Recognizer プロトコルと共通の正規化ユーティリティ."""
+"""Recognizer プロトコルと共通の正規化・ヘルパユーティリティ."""
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterable
 from typing import Protocol
 
 from ..types import Entity
+
+# 認識器間で共有するセパレーターパターン（ハイフン/空白）。各認識器が
+# digits-only に正規化する際に使う。
+SEPARATOR_PATTERN: re.Pattern[str] = re.compile(r"[-\s]")
 
 
 class Recognizer(Protocol):
@@ -70,6 +75,24 @@ def normalize_hyphens(text: str) -> str:
 def normalize(text: str) -> str:
     """数字とハイフンの両方を 1 パスで正規化。"""
     return text.translate(_NORMALIZE_TRANSLATION)
+
+
+def has_digit_boundary(text: str, start: int, end: int) -> bool:
+    """マッチ位置 [start, end) の直前または直後が数字なら True を返す。
+
+    認識器がマッチ範囲を別 ID（より長い番号列）の一部と切り分けるためのヘルパ。
+    True を返した場合、その候補は除外すべき。
+
+    Args:
+        text: 正規化後のテキスト（半角数字に統一されている前提）。
+        start: マッチ開始位置（包含）。
+        end: マッチ終端位置（除外）。
+    """
+    if start > 0 and text[start - 1].isdigit():
+        return True
+    if end < len(text) and text[end].isdigit():  # noqa: SIM103
+        return True
+    return False
 
 
 def default_recognizers() -> tuple[Recognizer, ...]:

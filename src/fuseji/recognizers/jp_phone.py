@@ -6,11 +6,10 @@ import re
 from collections.abc import Iterable
 
 from ..types import Entity
-from .base import normalize
+from .base import SEPARATOR_PATTERN, has_digit_boundary, normalize
 
 # 先頭 0 + 8〜10 桁 = 全 9〜11 桁。間に任意の `-` または空白を許容。
 _PHONE_PATTERN = re.compile(r"0(?:[-\s]?\d){8,10}")
-_SEPARATOR_PATTERN = re.compile(r"[-\s]")
 
 
 def _validate(digits: str) -> float | None:
@@ -50,11 +49,9 @@ class JpPhoneRecognizer:
             start = m.start()
             end = m.end()
             # 周辺が数字なら別 ID の一部とみなして除外
-            if start > 0 and normalized[start - 1].isdigit():
+            if has_digit_boundary(normalized, start, end):
                 continue
-            if end < len(normalized) and normalized[end].isdigit():
-                continue
-            digits = _SEPARATOR_PATTERN.sub("", m.group())
+            digits = SEPARATOR_PATTERN.sub("", m.group())
             score = _validate(digits)
             if score is None:
                 continue
