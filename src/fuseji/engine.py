@@ -36,6 +36,33 @@ class Masker:
         vault: 仮名化バウルト。指定時は `VaultStrategy(vault=vault)` が
             内部戦略として使われ、同一表層形は同一 placeholder。excluded type
             は番号なし `<TYPE>` 形式でマスクし、mapping に残らない。
+        max_json_depth: `mask_json` の再帰深度上限。超過時は fail-closed で
+            `"[fuseji: too deep]"` に置換される。
+
+    Example:
+        基本的な使い方:
+
+        >>> from fuseji import Masker
+        >>> masker = Masker()
+        >>> result = masker.mask("メール: taro@example.co.jp、電話 090-1234-5678")
+        >>> print(result.text)
+        メール: <EMAIL_1>、電話 <JP_PHONE_NUMBER_1>
+
+        Redact 戦略で固定文字列に:
+
+        >>> from fuseji import Masker, Redact
+        >>> masker = Masker(strategy=Redact())
+        >>> masker.mask("a@b.com").text
+        '[REDACTED]'
+
+        Vault で復元可能なマスキング:
+
+        >>> from fuseji import Masker, InMemoryVault
+        >>> vault = InMemoryVault()
+        >>> masker = Masker(vault=vault)
+        >>> r = masker.mask("a@b.com への返信")
+        >>> vault.restore(r.text)
+        'a@b.com への返信'
     """
 
     def __init__(
@@ -62,7 +89,14 @@ class Masker:
 
     def detect(self, text: str) -> tuple[Entity, ...]:
         """テキストから PII エンティティを検出し、threshold で絞り込んだ後、
-        オーバーラップをスコア優先で解決して返す。"""
+        オーバーラップをスコア優先で解決して返す。
+
+        Example:
+            >>> from fuseji import Masker
+            >>> entities = Masker().detect("メール a@b.com 電話 090-1234-5678")
+            >>> sorted({e.type for e in entities})
+            ['EMAIL', 'JP_PHONE_NUMBER']
+        """
         raw: list[Entity] = []
         for r in self._recognizers:
             raw.extend(r.analyze(text))
@@ -88,6 +122,14 @@ class Masker:
         ネスト深度が `max_json_depth`（デフォルト 100）を超えた要素は
         fail-closed で固定文字列 `"[fuseji: too deep]"` に置換される。
         スタック消費や無限再帰由来の DoS を抑止する。
+
+        Example:
+            >>> from fuseji import Masker
+            >>> result = Masker().mask_json({"email": "a@b.com", "user": "山田"})
+            >>> result["email"]
+            '<EMAIL_1>'
+            >>> result["user"]
+            '山田'
         """
         return self._mask_value(data, depth=0)
 

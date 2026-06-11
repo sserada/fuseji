@@ -49,6 +49,17 @@ class InMemoryVault:
         (type, surface) への重複 placeholder 発行は起きない。
         `get` / `restore` は dict 読み取りのみで CPython の GIL に守られる
         ため lock 不要。
+
+    Example:
+        >>> from fuseji import InMemoryVault
+        >>> vault = InMemoryVault()
+        >>> vault.assign("PERSON", "山田")
+        '<PERSON_1>'
+        >>> vault.assign("PERSON", "山田")  # 同じ surface には同じ placeholder
+        '<PERSON_1>'
+        >>> vault.assign("MY_NUMBER", "123456789012")  # 除外 type は None
+        >>> vault.restore("<PERSON_1>さん")
+        '山田さん'
     """
 
     #: 復元を許さないデフォルトの type 集合（番号法対応）

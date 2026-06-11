@@ -31,10 +31,19 @@ def make_mask_fn(masker: Masker | None = None) -> Callable[[Any], Any]:
         ``"[fuseji: masking failed]"`` 文字列を返す。PII 漏洩を避けるため
         原データはそのまま返さない。例外内容は WARN ログに記録する。
 
-    使い方:
-        >>> from langfuse import Langfuse
+    Example:
+        Langfuse SDK と統合:
+
+        >>> from langfuse import Langfuse  # doctest: +SKIP
         >>> from fuseji.integrations.langfuse import make_mask_fn
-        >>> langfuse = Langfuse(mask=make_mask_fn())
+        >>> langfuse = Langfuse(mask=make_mask_fn())  # doctest: +SKIP
+
+        スタンドアロンで動作確認:
+
+        >>> from fuseji.integrations.langfuse import make_mask_fn
+        >>> fn = make_mask_fn()
+        >>> "<EMAIL_1>" in fn({"data": "メール a@b.com"})["data"]
+        True
     """
     actual_masker: Masker = masker if masker is not None else Masker()
 
