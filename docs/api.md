@@ -358,9 +358,10 @@ langfuse = Langfuse(mask=make_mask_fn())
 
 ## FastAPI サーバー
 
-`fuseji.server.app.app`（`[server]` extra 必須）
+`fuseji.server.app`（`[server]` extra 必須）
 
-エンドポイント:
+### エンドポイント
+
 - `POST /mask` — 任意 JSON を `Masker.mask_json` で再帰マスク
 - `POST /detect` — テキストから entity 一覧を返す
 - `GET /healthz` — `{"status": "ok"}` を返す
@@ -370,5 +371,45 @@ langfuse = Langfuse(mask=make_mask_fn())
 pip install 'fuseji[server]'
 uvicorn fuseji.server.app:app --host 0.0.0.0 --port 8000
 ```
+
+### `create_app(...)` factory
+
+カスタム `Masker` / リソース上限を指定するための DI factory。
+
+```python
+def create_app(
+    masker: Masker | None = None,
+    *,
+    max_body_bytes: int | None = None,
+    timeout_seconds: float | None = None,
+) -> FastAPI: ...
+```
+
+| 引数 | デフォルト | 説明 |
+| --- | --- | --- |
+| `masker` | `Masker()`（v0.1 デフォルト認識器） | カスタム認識器・Vault・NER を統合したい場合に明示指定 |
+| `max_body_bytes` | `FUSEJI_SERVER_MAX_BODY_BYTES` or 1 MB | `Content-Length` が超過すると HTTP 413 |
+| `timeout_seconds` | `FUSEJI_SERVER_TIMEOUT_SECONDS` or 30 秒 | 1 リクエスト処理が超過すると HTTP 504 |
+
+```python
+from fuseji import Masker, InMemoryVault
+from fuseji.server.app import create_app
+
+app = create_app(
+    masker=Masker(vault=InMemoryVault()),
+    max_body_bytes=512_000,
+    timeout_seconds=10.0,
+)
+```
+
+### ミドルウェア
+
+- `BodySizeLimitMiddleware` — `Content-Length` ヘッダによるサイズ制限
+- `RequestTimeoutMiddleware` — `asyncio.wait_for` ベースのレスポンス時間有界化。
+  同期エンドポイントが threadpool で実行されるため、タイムアウト発火後もスレッド側の
+  処理は継続する（CPU 解放保証はない）。レスポンス時間の有界化が目的の DoS 緩和策。
+
+モジュールスコープ `app = create_app()` は環境変数ベースの既定設定で構築されたインスタンス。
+`uvicorn fuseji.server.app:app` で起動するシナリオの後方互換のため残されている。
 
 詳細は [README.md](../README.md) の「サーバーモード」を参照。
