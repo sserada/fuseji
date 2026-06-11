@@ -37,9 +37,7 @@ class TestUsageScenarios:
     def test_Vault_の_excluded_types_に渡せる(self) -> None:
         from fuseji import InMemoryVault
 
-        vault = InMemoryVault(
-            excluded_types=[entity_types.MY_NUMBER, entity_types.EMAIL]
-        )
+        vault = InMemoryVault(excluded_types=[entity_types.MY_NUMBER, entity_types.EMAIL])
         assert "MY_NUMBER" in vault.excluded_types
         assert "EMAIL" in vault.excluded_types
         assert vault.assign("EMAIL", "x@y.z") is None  # 除外される
