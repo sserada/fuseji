@@ -36,9 +36,7 @@ _RECOGNIZERS = [
 
 @pytest.mark.parametrize("name,recognizer", _RECOGNIZERS, ids=[r[0] for r in _RECOGNIZERS])
 @pytest.mark.parametrize("kb", [1, 4])
-def test_recognizer_per_kb(
-    benchmark: Any, name: str, recognizer: Any, kb: int
-) -> None:
+def test_recognizer_per_kb(benchmark: Any, name: str, recognizer: Any, kb: int) -> None:
     text = _sample_text(kb)
     benchmark.group = f"recognizer_{kb}KB"
     benchmark(lambda: list(recognizer.analyze(text)))

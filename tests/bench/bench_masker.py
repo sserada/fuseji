@@ -29,9 +29,7 @@ def masker() -> Masker:
 
 
 @pytest.mark.parametrize("kb", [1, 4, 16])
-def test_masker_full_pipeline(
-    benchmark: Any, masker: Masker, kb: int
-) -> None:
+def test_masker_full_pipeline(benchmark: Any, masker: Masker, kb: int) -> None:
     """detect → mask の full pipeline レイテンシ."""
     text = _build_text(kb)
     benchmark.group = f"masker_{kb}KB"
