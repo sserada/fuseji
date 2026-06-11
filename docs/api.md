@@ -408,6 +408,8 @@ def create_app(
     *,
     max_body_bytes: int | None = None,
     timeout_seconds: float | None = None,
+    api_key: str | None = None,
+    cors_origins: Sequence[str] | None = None,
 ) -> FastAPI: ...
 ```
 
@@ -416,6 +418,8 @@ def create_app(
 | `masker` | `Masker()`（v0.1 デフォルト認識器） | カスタム認識器・Vault・NER を統合したい場合に明示指定 |
 | `max_body_bytes` | `FUSEJI_SERVER_MAX_BODY_BYTES` or 1 MB | `Content-Length` が超過すると HTTP 413 |
 | `timeout_seconds` | `FUSEJI_SERVER_TIMEOUT_SECONDS` or 30 秒 | 1 リクエスト処理が超過すると HTTP 504 |
+| `api_key` | `FUSEJI_API_KEY` or `None` (無認証) | `X-API-Key` ヘッダで認証。`/healthz` `/openapi.json` は保護対象外 |
+| `cors_origins` | `FUSEJI_CORS_ORIGINS`（カンマ区切り）or `None` (CORS 無効) | CORS 許可オリジン。インターネット公開時は明示必須 |
 
 ```python
 from fuseji import Masker, InMemoryVault
@@ -430,10 +434,12 @@ app = create_app(
 
 ### ミドルウェア
 
-- `BodySizeLimitMiddleware` — `Content-Length` ヘッダによるサイズ制限
+- `BodySizeLimitMiddleware` — pure ASGI middleware で body stream を逐次読み取り、`Content-Length` 有無に関わらず累積バイト数で 413 判定（chunked 攻撃対応、#87）
+- `ApiKeyAuthMiddleware` — `X-API-Key` ヘッダの timing-safe 比較で `/mask` `/detect` を保護（#83、opt-in）
 - `RequestTimeoutMiddleware` — `asyncio.wait_for` ベースのレスポンス時間有界化。
   同期エンドポイントが threadpool で実行されるため、タイムアウト発火後もスレッド側の
   処理は継続する（CPU 解放保証はない）。レスポンス時間の有界化が目的の DoS 緩和策。
+- `CORSMiddleware`（starlette 標準）— `cors_origins` 指定時のみ登録。`allow_methods=["GET","POST"]`, `allow_headers=["Content-Type","X-API-Key"]`
 
 モジュールスコープ `app = create_app()` は環境変数ベースの既定設定で構築されたインスタンス。
 `uvicorn fuseji.server.app:app` で起動するシナリオの後方互換のため残されている。

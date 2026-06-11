@@ -140,13 +140,17 @@ curl -X POST http://localhost:8000/detect \
 
 OpenAPI スキーマ: `http://localhost:8000/openapi.json`
 
-### 運用上の上限値
+### 運用上の上限値・認証
 
 | 制限 | デフォルト | 環境変数 / API | 超過時の挙動 |
 | --- | --- | --- | --- |
 | リクエストボディサイズ | 1 MB | `FUSEJI_SERVER_MAX_BODY_BYTES` / `create_app(max_body_bytes=...)` | HTTP 413 |
 | 1 リクエストあたり処理時間 | 30 秒 | `FUSEJI_SERVER_TIMEOUT_SECONDS` / `create_app(timeout_seconds=...)` | HTTP 504 |
 | `mask_json` 再帰深度 | 100 | `Masker(max_json_depth=...)` | `"[fuseji: too deep]"` で fail-closed |
+| API キー認証 | 無認証 | `FUSEJI_API_KEY` / `create_app(api_key=...)` | `X-API-Key` 不一致で HTTP 401 |
+| CORS 許可オリジン | CORS 無効 | `FUSEJI_CORS_ORIGINS` (カンマ区切り) / `create_app(cors_origins=...)` | 未許可オリジンは ACAO ヘッダなし |
+
+> ⚠️ **インターネット公開時** は `FUSEJI_API_KEY` と `FUSEJI_CORS_ORIGINS` の両方を必ず設定すること。信頼境界内のサイドカー運用が前提。
 
 ## セキュリティ・法令上の注意
 
