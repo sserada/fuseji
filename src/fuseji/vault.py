@@ -94,6 +94,13 @@ class InMemoryVault:
         """
         return len(self._placeholder_to_surface)
 
+    def __repr__(self) -> str:
+        excluded = sorted(self._excluded)
+        return (
+            f"InMemoryVault(size={self.size}, "
+            f"excluded_types={excluded!r})"
+        )
+
     def assign(self, entity_type: str, surface: str) -> str | None:
         if entity_type in self._excluded:
             return None

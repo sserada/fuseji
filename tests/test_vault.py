@@ -135,6 +135,28 @@ class TestRestore:
         assert v.restore("<PERSON_1>") == "<PERSON_1>"
 
 
+class TestRepr:
+    def test_空の_repr(self) -> None:
+        v = InMemoryVault()
+        r = repr(v)
+        assert "InMemoryVault" in r
+        assert "size=0" in r
+        assert "'MY_NUMBER'" in r  # default excluded
+
+    def test_assign_後の_repr_は_size_を反映(self) -> None:
+        v = InMemoryVault()
+        v.assign("PERSON", "山田")
+        v.assign("PERSON", "佐藤")
+        r = repr(v)
+        assert "size=2" in r
+
+    def test_カスタム_excluded_の_repr(self) -> None:
+        v = InMemoryVault(excluded_types=["EMAIL", "CREDIT_CARD"])
+        r = repr(v)
+        assert "'CREDIT_CARD'" in r
+        assert "'EMAIL'" in r
+
+
 class TestSize:
     def test_初期は_0(self) -> None:
         v = InMemoryVault()
