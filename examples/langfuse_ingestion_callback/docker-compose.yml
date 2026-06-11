@@ -1,0 +1,21 @@
+# Langfuse ingestion masking callback として fuseji-server を起動する最小構成
+# 実際の Langfuse self-hosted は別途立ち上げ、masking endpoint として
+# http://fuseji-server:8000/mask を設定する。
+services:
+  fuseji-server:
+    image: python:3.13-slim
+    container_name: fuseji-server
+    working_dir: /app
+    command: >
+      bash -c "
+      pip install --no-cache-dir 'fuseji[server]>=0.1.0' &&
+      uvicorn fuseji.server.app:app --host 0.0.0.0 --port 8000
+      "
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

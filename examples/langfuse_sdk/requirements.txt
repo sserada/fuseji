@@ -1,0 +1,2 @@
+fuseji>=0.1.0
+langfuse>=2.0

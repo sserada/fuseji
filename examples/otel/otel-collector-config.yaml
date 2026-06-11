@@ -1,0 +1,40 @@
+# OTel Collector のリファレンス設定（fuseji-server と組み合わせる想定）
+# 実環境では gen_ai.prompt / gen_ai.completion を含む span のみ filter する
+# などの最適化が必要。
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    timeout: 5s
+    send_batch_size: 100
+
+  # 注: OTel Collector ビルトインでは HTTP forward processor を直接記述できないため、
+  # 実運用では Custom Processor / Lambda / Sidecar pattern いずれかが必要。
+  # 下記は属性削除のフォールバック例（マスクではなく削除）。
+  attributes/redact_pii:
+    actions:
+      - key: gen_ai.prompt
+        action: delete
+      - key: gen_ai.completion
+        action: delete
+
+exporters:
+  debug:
+    verbosity: detailed
+
+  # 例: Langfuse OTLP receiver
+  # otlphttp/langfuse:
+  #   endpoint: https://your-langfuse.example.com/api/otel
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch, attributes/redact_pii]
+      exporters: [debug]
