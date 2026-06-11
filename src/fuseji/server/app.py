@@ -11,7 +11,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.types import ASGIApp
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from .. import __version__
 from ..engine import Masker
@@ -25,30 +25,86 @@ DEFAULT_TIMEOUT_SECONDS: float = 30.0
 _ENV_TIMEOUT = "FUSEJI_SERVER_TIMEOUT_SECONDS"
 
 
-class BodySizeLimitMiddleware(BaseHTTPMiddleware):
-    """Content-Length が上限を超える要求を 413 で拒否するミドルウェア。
+class BodySizeLimitMiddleware:
+    """リクエストボディサイズを上限で制限する pure ASGI ミドルウェア (#87)。
 
-    Content-Length ヘッダが付かない chunked エンコーディング等には対応しない
-    （reverse-proxy 側で別途制限すること）。
+    Content-Length ヘッダ有無に関わらずボディ全体を逐次読み取り、累積バイト数が
+    `max_bytes` を超えた時点で **下流アプリにボディを渡さず** 413 を返す。
+    chunked transfer-encoding / HTTP/2 / Content-Length 省略の DoS 経路にも
+    対応する。
+
+    実装方針:
+    1. Content-Length が宣言されていて max を超える場合は受信前に 413
+    2. それ以外は `receive` をラップしてバイト数を累積カウント
+    3. 上限を超えたらラッパーが 413 を送信し、上流アプリへの呼び出しを中止
+    4. 上限内なら全 body を buffer し、replay 用の receive で下流に渡す
+       （1MB 程度の bounded buffer なのでメモリ的に許容範囲）
     """
 
     def __init__(self, app: ASGIApp, max_bytes: int) -> None:
-        super().__init__(app)
+        self._app = app
         self._max_bytes = max_bytes
 
-    async def dispatch(self, request: Request, call_next: Any) -> Any:
-        cl = request.headers.get("content-length")
-        if cl is not None:
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self._app(scope, receive, send)
+            return
+        # Content-Length 宣言済みなら受信前に弾く（fast path）
+        headers = dict(scope.get("headers", []))
+        cl_raw = headers.get(b"content-length")
+        if cl_raw is not None:
             try:
-                if int(cl) > self._max_bytes:
-                    return JSONResponse(
-                        {"detail": "payload too large"},
-                        status_code=413,
-                    )
+                if int(cl_raw) > self._max_bytes:
+                    await _send_413(send)
+                    return
             except ValueError:
-                # 不正な Content-Length は通常 starlette が 400 にする。素通し。
+                # 不正な Content-Length は受信側で扱う
                 pass
-        return await call_next(request)
+        # ボディを逐次読みつつ上限を判定。超過時は 413 を返して終了。
+        body_chunks: list[bytes] = []
+        total = 0
+        more_body = True
+        while more_body:
+            msg = await receive()
+            if msg["type"] != "http.request":
+                # disconnect 等のイベント — 安全側で下流に渡さず終了
+                return
+            chunk = msg.get("body", b"")
+            total += len(chunk)
+            if total > self._max_bytes:
+                await _send_413(send)
+                return
+            body_chunks.append(chunk)
+            more_body = msg.get("more_body", False)
+        buffered_body = b"".join(body_chunks)
+        # 下流の receive を replay で 1 回だけボディを返すラッパーに置き換える。
+        # disconnect イベントが来たら以降は本物の receive() に委譲。
+        sent = False
+
+        async def receive_buffered() -> Message:
+            nonlocal sent
+            if not sent:
+                sent = True
+                return {"type": "http.request", "body": buffered_body, "more_body": False}
+            return await receive()
+
+        await self._app(scope, receive_buffered, send)
+
+
+async def _send_413(send: Send) -> None:
+    """payload too large を JSON で返す ASGI 直接送信."""
+    body = b'{"detail":"payload too large"}'
+    await send(
+        {
+            "type": "http.response.start",
+            "status": 413,
+            "headers": [
+                (b"content-type", b"application/json"),
+                (b"content-length", str(len(body)).encode("ascii")),
+            ],
+        }
+    )
+    await send({"type": "http.response.body", "body": body})
 
 
 _T = TypeVar("_T", int, float)

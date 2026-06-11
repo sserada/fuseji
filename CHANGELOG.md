@@ -86,6 +86,10 @@
 
 ### Security
 
+- `BodySizeLimitMiddleware` を pure ASGI middleware に書き換え、chunked リクエストでも上限を強制（#87）:
+  - Content-Length 宣言の有無に関わらず body stream を逐次読み取り、累積バイト数が `max_bytes` を超えた時点で下流アプリにボディを渡さず 413 を返す
+  - chunked transfer-encoding / HTTP/2 / Content-Length 省略経路の DoS を遮断
+  - 上限内のリクエストは buffer → replay receive で下流に転送（1MB の bounded buffer なのでメモリ的に許容）
 - `fuseji.server.app.RequestTimeoutMiddleware` を追加。/mask /detect エンドポイントの
   1 リクエストあたり処理時間に上限を設け、超過時は HTTP 504 を返す。デフォルト 30 秒、
   環境変数 `FUSEJI_SERVER_TIMEOUT_SECONDS` または `create_app(timeout_seconds=...)`
