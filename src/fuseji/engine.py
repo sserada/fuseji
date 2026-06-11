@@ -40,6 +40,11 @@ class Masker:
             は番号なし `<TYPE>` 形式でマスクし、mapping に残らない。
         max_json_depth: `mask_json` の再帰深度上限。超過時は fail-closed で
             `"[fuseji: too deep]"` に置換される。
+        mask_dict_keys: `True` のとき `mask_json` で dict のキー（str のみ）も
+            値と同じ戦略でマスクする。デフォルトは `False`（v0.1 互換）で、
+            キーは PII を含まない前提で素通しされる。LLM オブザーバビリティ
+            用途で `{"taro@example.com": ...}` のように動的キーへ PII が
+            混入するケースが想定される場合に True を指定する。
 
     Example:
         基本的な使い方:
@@ -75,6 +80,7 @@ class Masker:
         threshold: float = 0.4,
         vault: Vault | None = None,
         max_json_depth: int = DEFAULT_MAX_JSON_DEPTH,
+        mask_dict_keys: bool = False,
     ) -> None:
         self._recognizers: tuple[Recognizer, ...] = (
             tuple(recognizers) if recognizers is not None else default_recognizers()
@@ -97,6 +103,7 @@ class Masker:
             self._strategy = strategy if strategy is not None else Placeholder()
         self._threshold = threshold
         self._max_json_depth = max_json_depth
+        self._mask_dict_keys = mask_dict_keys
 
     def detect(self, text: str) -> tuple[Entity, ...]:
         """テキストから PII エンティティを検出し、threshold で絞り込んだ後、
@@ -156,12 +163,37 @@ class Masker:
         if isinstance(data, str):
             return self.mask(data).text
         if isinstance(data, dict):
-            return {k: self._mask_value(v, depth=depth + 1) for k, v in data.items()}
+            return self._mask_dict(data, depth=depth)
         if isinstance(data, list):
             return [self._mask_value(v, depth=depth + 1) for v in data]
         if isinstance(data, tuple):
             return tuple(self._mask_value(v, depth=depth + 1) for v in data)
         return data
+
+    def _mask_dict(self, data: dict[Any, Any], *, depth: int) -> dict[Any, Any]:
+        """dict を再帰マスク。`mask_dict_keys=True` のときキーもマスク対象。
+
+        キーをマスクすると衝突する可能性があるため、衝突時は `__N` サフィックス
+        で連番化して一意性を保つ（情報が失われない）。
+        """
+        result: dict[Any, Any] = {}
+        if not self._mask_dict_keys:
+            for k, v in data.items():
+                result[k] = self._mask_value(v, depth=depth + 1)
+            return result
+        # mask_dict_keys=True: str キーをマスクし、衝突時はサフィックスで分離
+        seen_keys: dict[Any, int] = {}
+        for k, v in data.items():
+            masked_key = self.mask(k).text if isinstance(k, str) else k
+            count = seen_keys.get(masked_key, 0)
+            if count > 0:
+                # 衝突を回避するため `__N` を付与（例: <EMAIL_1>__2）
+                final_key: Any = f"{masked_key}__{count + 1}"
+            else:
+                final_key = masked_key
+            seen_keys[masked_key] = count + 1
+            result[final_key] = self._mask_value(v, depth=depth + 1)
+        return result
 
 
 def _resolve_overlaps(entities: Sequence[Entity]) -> list[Entity]:
