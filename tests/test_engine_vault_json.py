@@ -119,3 +119,31 @@ class TestMaskJson:
         data = {"l1": {"l2": {"l3": "a@b.com"}}}
         result = m.mask_json(data)
         assert "<EMAIL_1>" in result["l1"]["l2"]["l3"]
+
+    def test_境界_max_json_depth_N_では_N_段ぎりぎりまで許容(self) -> None:
+        # max_json_depth=2: depth 0,1 のみ許容、depth 2 で fail-closed
+        # ルート dict(depth=0) → 値 dict(depth=1 で処理) → その値文字列(depth=2 で too_deep)
+        m = Masker(max_json_depth=2)
+        data = {"l1": {"l2": "a@b.com"}}
+        result = m.mask_json(data)
+        # l2 の値（文字列）が depth=2 に達して too_deep
+        assert result == {"l1": {"l2": "[fuseji: too deep]"}}
+
+    def test_境界_max_json_depth_1_ではルート値のみ_too_deep(self) -> None:
+        # max_json_depth=1: depth 0 のみ処理、depth 1 で fail-closed
+        m = Masker(max_json_depth=1)
+        # ルート dict は depth=0 で処理されるが、値は depth=1 で too_deep
+        result = m.mask_json({"x": "a@b.com"})
+        assert result == {"x": "[fuseji: too deep]"}
+
+    def test_境界_max_json_depth_0_ではルート自体_too_deep(self) -> None:
+        # max_json_depth=0: 何も再帰せず、ルート自体が too_deep
+        m = Masker(max_json_depth=0)
+        result = m.mask_json("a@b.com")
+        assert result == "[fuseji: too deep]"
+
+    def test_スカラ値はネストカウントしない_深度_0_OK(self) -> None:
+        # ルートが str の場合、depth=0 で処理されてマスクされる
+        m = Masker(max_json_depth=1)
+        result = m.mask_json("メール: a@b.com")
+        assert "<EMAIL_1>" in result

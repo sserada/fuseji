@@ -132,9 +132,11 @@ class Masker:
 
         辞書のキーは PII を含まない前提で、値のみマスクする。
 
-        ネスト深度が `max_json_depth`（デフォルト 100）を超えた要素は
-        fail-closed で固定文字列 `"[fuseji: too deep]"` に置換される。
-        スタック消費や無限再帰由来の DoS を抑止する。
+        ネスト深度の上限は `max_json_depth`（デフォルト 100）。
+        ルート要素を depth=0 とし、`max_json_depth=N` のとき depth `0..N-1` の
+        計 N 段まで再帰を許容、depth N 以降は fail-closed で固定文字列
+        `"[fuseji: too deep]"` に置換される。スタック消費や無限再帰由来の
+        DoS を抑止する。
 
         Example:
             >>> from fuseji import Masker
@@ -147,7 +149,9 @@ class Masker:
         return self._mask_value(data, depth=0)
 
     def _mask_value(self, data: Any, *, depth: int) -> Any:
-        if depth > self._max_json_depth:
+        # max_json_depth=N で 0..N-1 段（合計 N 段）まで許容、N 段目以降は fail-closed。
+        # 旧 v0.1 は `depth > N` で off-by-one だった（実際は N+1 段許容）→ v0.2 で修正 (#99)。
+        if depth >= self._max_json_depth:
             return _TOO_DEEP_PLACEHOLDER
         if isinstance(data, str):
             return self.mask(data).text
