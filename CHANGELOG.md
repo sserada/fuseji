@@ -19,8 +19,14 @@ post-0.1.0 の改善（次のマイナーリリースに含める想定）。
 - **レイテンシ回帰検知テスト** `tests/test_latency_regression.py`: 通常 pytest で実行され、O(n²) バグ等の性能回帰を即時 fail させる
 - **認識器の共通ヘルパ** `recognizers/base.py` に `SEPARATOR_PATTERN` と `has_digit_boundary()` を抽出
 - **テスト共通ヘルパ** `tests/conftest.py` で `make_entity` を集約（旧 `_entity` のヘルパ重複を解消）
+- **`fuseji.entity_types` 定数モジュール**: `EMAIL` / `CREDIT_CARD` / `MY_NUMBER` / `JP_PHONE_NUMBER` / `JP_POSTAL_CODE` / `PERSON` を str 定数として提供。`V0_1_TYPES` frozenset も。`from fuseji import entity_types` または `from fuseji.entity_types import MY_NUMBER`。内部実装でも単一ソース化済み
+- **`InMemoryVault.clear()`**: 全 placeholder マッピングと番号カウンタを破棄。`excluded_types` 設定は維持。`threading.Lock` で保護。長時間稼働サーバーでのメモリ解放、テストでの状態リセットに有用
+- **Python 3.14 サポート** を classifier と CI test-core マトリクスに追加（test-extras は spaCy 3.8 の wheel 制約で 3.13 まで）
+- **VaultStrategy 単体テスト**: `Masker` を介さない直接利用のテストを追加
 
 ### Changed
+
+- **`Masker(vault=..., strategy=...)` 同時指定で UserWarning** を発行。これまで docstring に「vault 優先」と明記しつつ silent に受け入れていたため、ランタイムで設定ミスに気付けるようにする。挙動は変わらず vault 優先のまま
 
 - **`InMemoryVault.assign`** を `threading.Lock` で保護（double-checked locking パターン）。Uvicorn の thread pool 経由でも並行採番衝突なし
 - **Langfuse adapter のログ出力**: デフォルトで例外型名のみ（traceback なし）。トレースバック中の PII 漏洩を防ぐ。デバッグ用 escape hatch として `FUSEJI_LANGFUSE_LOG_TRACEBACK=1` 環境変数で従来の `logger.exception` 動作に戻せる
@@ -29,6 +35,7 @@ post-0.1.0 の改善（次のマイナーリリースに含める想定）。
 
 - **examples/**: Langfuse SDK / ingestion callback / OTel / GiNZA の 4 種類のサンプル
 - **docs/design.md / docs/api.md**: 設計ドキュメントの公開部分と API リファレンス
+- **SECURITY.md** を v0.1.x の追加機構で更新（traceback 除去、depth/body 制限、Vault.clear、thread-safety、FusejiError 階層）
 
 ## [0.1.0] - 2026-06-11
 
