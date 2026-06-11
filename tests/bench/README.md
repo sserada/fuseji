@@ -17,6 +17,9 @@ uv run pytest tests/bench/ --benchmark-only -v
 - `bench_recognizers.py`: 各認識器単独のレイテンシ
 - `bench_replace_spans.py`: `_replace_spans` のスケール曲線
 - `bench_vault.py`: `InMemoryVault.restore` のスケール曲線
+- `bench_resolve_overlaps.py`: `_resolve_overlaps` の entity 数スケール曲線（#98）
+- `bench_mask_json.py`: `Masker.mask_json` の leaf 数 / ネスト深度スケール（#98）
+- `bench_strategies.py`: Placeholder / Redact / Hash / VaultStrategy の横並び比較（#98）
 
 ## レイテンシ目標（design_docs §2 より）
 
