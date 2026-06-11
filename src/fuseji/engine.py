@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
 from .recognizers.base import default_recognizers
-from .strategies import Placeholder
+from .strategies import Placeholder, VaultStrategy
 from .types import Entity, MaskResult
 
 if TYPE_CHECKING:
@@ -25,16 +25,17 @@ class Masker:
     """fuseji の中核クラス。
 
     認識器（正規表現/checksum）と NER バックエンドを統合し、検出した
-    PII エンティティを戦略でマスクする。Vault が指定された場合は復元可能な
-    Placeholder 形式で常にマスクし、戦略指定は無視される。
+    PII エンティティを戦略でマスクする。
 
     Args:
         recognizers: 使用する認識器。`None` で v0.1 のデフォルトセット。
         ner: NER バックエンド（GiNZA 等）。`None` で NER 無効。
-        strategy: マスキング戦略（Placeholder/Redact/Hash）。Vault 指定時は無視。
+        strategy: マスキング戦略（Placeholder/Redact/Hash）。Vault 指定時は
+            `VaultStrategy` で自動的に置き換えられ、本引数は無視される。
         threshold: このスコア未満のエンティティは除外する。recall 重視で 0.4。
-        vault: 仮名化バウルト。指定すると Placeholder 形式で必ずマスクし、
-            mapping を vault に蓄積する。同一表層形は同一 placeholder。
+        vault: 仮名化バウルト。指定時は `VaultStrategy(vault=vault)` が
+            内部戦略として使われ、同一表層形は同一 placeholder。excluded type
+            は番号なし `<TYPE>` 形式でマスクし、mapping に残らない。
     """
 
     def __init__(
@@ -50,9 +51,13 @@ class Masker:
             tuple(recognizers) if recognizers is not None else default_recognizers()
         )
         self._ner = ner
-        self._strategy: MaskStrategy = strategy if strategy is not None else Placeholder()
+        # vault があれば VaultStrategy で吸収し、戦略経路を単一化する。
+        # strategy 引数は vault と排他（vault 優先、strategy 無視）。
+        if vault is not None:
+            self._strategy: MaskStrategy = VaultStrategy(vault=vault)
+        else:
+            self._strategy = strategy if strategy is not None else Placeholder()
         self._threshold = threshold
-        self._vault = vault
         self._max_json_depth = max_json_depth
 
     def detect(self, text: str) -> tuple[Entity, ...]:
@@ -69,12 +74,7 @@ class Masker:
     def mask(self, text: str) -> MaskResult:
         """テキストをマスクして MaskResult を返す。"""
         entities = self.detect(text)
-        masked_text: str
-        mapping: Mapping[str, str]
-        if self._vault is not None:
-            masked_text, mapping = _mask_with_vault(text, entities, self._vault)
-        else:
-            masked_text, mapping = self._strategy.mask(text, entities)
+        masked_text, mapping = self._strategy.mask(text, entities)
         return MaskResult(text=masked_text, entities=entities, mapping=mapping)
 
     def mask_json(self, data: Any) -> Any:
@@ -121,26 +121,3 @@ def _resolve_overlaps(entities: Sequence[Entity]) -> list[Entity]:
         accepted.append(e)
         spans.append((e.start, e.end))
     return sorted(accepted, key=lambda e: e.start)
-
-
-def _mask_with_vault(
-    text: str, entities: Sequence[Entity], vault: Vault
-) -> tuple[str, dict[str, str]]:
-    """vault を使ってエンティティをマスクし、(masked_text, mapping) を返す。
-
-    excluded type（vault.assign が None を返す）の場合は番号なしの
-    `<TYPE>` 形式でマスクし、mapping には残さない（復元不可）。
-    """
-    from .strategies import _replace_spans
-
-    replacements: list[tuple[int, int, str]] = []
-    mapping: dict[str, str] = {}
-    for e in entities:
-        ph = vault.assign(e.type, e.text)
-        if ph is None:
-            ph = f"<{e.type}>"
-        else:
-            mapping[ph] = e.text
-        replacements.append((e.start, e.end, ph))
-
-    return _replace_spans(text, replacements), mapping

@@ -1,13 +1,16 @@
-"""マスキング戦略 — MaskStrategy プロトコルと Placeholder / Redact / Hash 実装."""
+"""マスキング戦略 — MaskStrategy プロトコルと Placeholder / Redact / Hash / VaultStrategy 実装."""
 
 from __future__ import annotations
 
 import hashlib
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from .types import Entity
+
+if TYPE_CHECKING:
+    from .vault import Vault
 
 
 class MaskStrategy(Protocol):
@@ -78,6 +81,34 @@ class Redact:
         replacements = [(e.start, e.end, self.replacement) for e in entities]
         masked = _replace_spans(text, replacements)
         return masked, {}
+
+
+@dataclass(frozen=True, slots=True)
+class VaultStrategy:
+    """Vault と連動して復元可能な Placeholder 形式でマスクする戦略。
+
+    各 (type, surface) に対し `vault.assign()` で placeholder を取得する。
+    同一 surface は vault のライフタイムに渡って同一 placeholder。
+    excluded type（`vault.assign` が None を返す）は番号なし `<TYPE>` 形式で
+    マスクし、`mapping` には残さない（復元不可、番号法対応）。
+
+    `Masker(vault=...)` 指定時に自動で組み立てられるため、通常はユーザーが
+    直接インスタンス化する必要はない。
+    """
+
+    vault: Vault
+
+    def mask(self, text: str, entities: Sequence[Entity]) -> tuple[str, Mapping[str, str]]:
+        replacements: list[tuple[int, int, str]] = []
+        mapping: dict[str, str] = {}
+        for e in entities:
+            ph = self.vault.assign(e.type, e.text)
+            if ph is None:
+                ph = f"<{e.type}>"
+            else:
+                mapping[ph] = e.text
+            replacements.append((e.start, e.end, ph))
+        return _replace_spans(text, replacements), mapping
 
 
 @dataclass(frozen=True, slots=True)
