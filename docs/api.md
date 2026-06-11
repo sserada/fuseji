@@ -149,11 +149,13 @@ class Vault(Protocol):
     def assign(self, entity_type: str, surface: str) -> str | None: ...
     def get(self, placeholder: str) -> str | None: ...
     def restore(self, text: str) -> str: ...
+    def clear(self) -> None: ...
 ```
 
 - **`assign(type, surface)`** — `(type, surface)` に placeholder を割り当てて返す。excluded type の場合は `None`（呼び出し側で別途マスクする必要あり）
 - **`get(placeholder)`** — placeholder から元 surface を取得。未登録なら `None`
 - **`restore(text)`** — text 中の登録済み placeholder を元 surface に置換して返す
+- **`clear()`** — すべての placeholder マッピングを破棄して空の状態に戻す
 
 ### `InMemoryVault`
 
@@ -162,6 +164,16 @@ class InMemoryVault:
     DEFAULT_EXCLUDED_TYPES: frozenset[str] = frozenset({"MY_NUMBER"})
 
     def __init__(self, excluded_types: Iterable[str] | None = None) -> None: ...
+
+    @property
+    def excluded_types(self) -> frozenset[str]: ...
+
+    @property
+    def size(self) -> int: ...  # 登録済み placeholder 数
+
+    def clear(self) -> None: ...  # マッピングを破棄。excluded_types 設定は維持
+
+    def __repr__(self) -> str: ...  # InMemoryVault(size=..., excluded_types=...)
 ```
 
 - 同一 `(type, surface)` には常に同一 placeholder を返す
@@ -169,6 +181,48 @@ class InMemoryVault:
 - `excluded_types` に含まれる type は `assign` で `None` を返し対応表に残さない
 - デフォルトは `MY_NUMBER`（番号法対応で復元を許さない）
 - `excluded_types` を空指定で `MY_NUMBER` も対応表に含めることは可能（番号法上の責任は利用者側に帰属）
+- `assign` は内部 `threading.Lock` で保護されており、Uvicorn の thread pool 経由で並行に呼ばれても安全
+
+---
+
+## エンティティ種別の定数
+
+`fuseji.entity_types` — ハードコード文字列の代わりに使えるタイプセーフな定数モジュール。
+
+```python
+from fuseji import entity_types
+from fuseji.entity_types import MY_NUMBER, EMAIL  # 直接 import も可
+
+entity_types.EMAIL              # "EMAIL"
+entity_types.CREDIT_CARD        # "CREDIT_CARD"
+entity_types.MY_NUMBER          # "MY_NUMBER"
+entity_types.JP_PHONE_NUMBER    # "JP_PHONE_NUMBER"
+entity_types.JP_POSTAL_CODE     # "JP_POSTAL_CODE"
+entity_types.PERSON             # "PERSON"
+entity_types.V0_1_TYPES         # frozenset of all 6
+```
+
+値は `str` そのものなので `Entity.type` 比較や `excluded_types` 渡しに直接使えます。
+
+---
+
+## 例外階層
+
+```python
+from fuseji import FusejiError, InvalidEntityError, InvalidConfigError
+
+try:
+    masker.mask(...)
+except FusejiError:
+    # fuseji 由来のみキャッチ
+    pass
+```
+
+- `FusejiError(Exception)`: fuseji 例外の基底
+- `InvalidEntityError(FusejiError, ValueError)`: Entity 構築不正
+- `InvalidConfigError(FusejiError, ValueError)`: 戦略・Vault 等の設定不正
+
+`ValueError` も多重継承しているため、既存の `except ValueError` も従来通り動作します。
 
 ---
 
