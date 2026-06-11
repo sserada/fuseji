@@ -8,9 +8,7 @@ from fuseji.engine import Masker, _resolve_overlaps
 from fuseji.strategies import Redact
 from fuseji.types import Entity
 
-
-def _entity(type_: str, text: str, start: int, end: int, score: float = 1.0) -> Entity:
-    return Entity(type=type_, text=text, start=start, end=end, score=score, recognizer="test")
+from .conftest import make_entity as _entity
 
 
 class _StubRecognizer:
