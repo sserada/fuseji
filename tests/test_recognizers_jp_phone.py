@@ -116,3 +116,30 @@ class TestJpPhoneRecognizer:
 
     def test_空文字列(self) -> None:
         assert list(JpPhoneRecognizer().analyze("")) == []
+
+
+class TestJpPhoneUnicodeEdges:
+    """Unicode セパレーターやオフセット境界の回帰テスト (#91)."""
+
+    def test_全角空白を許容する(self) -> None:
+        # U+3000 IDEOGRAPHIC SPACE は \s にマッチするので電話番号として扱える
+        text = "TEL: 090　1234　5678"
+        entities = list(JpPhoneRecognizer().analyze(text))
+        assert len(entities) == 1
+        assert entities[0].score == 0.95
+
+    def test_ノーブレークスペースを許容する(self) -> None:
+        # U+00A0 NO-BREAK SPACE も \s にマッチ
+        text = "TEL: 090 1234 5678"
+        entities = list(JpPhoneRecognizer().analyze(text))
+        assert len(entities) == 1
+        assert entities[0].score == 0.95
+
+    def test_絵文字隣接でもオフセットが正しい(self) -> None:
+        # サロゲートペアを含む絵文字 (U+1F600) の前後でも Python の str は
+        # コードポイント単位で扱うため start/end は安定
+        text = "😀090-1234-5678😀"
+        entities = list(JpPhoneRecognizer().analyze(text))
+        assert len(entities) == 1
+        e = entities[0]
+        assert text[e.start : e.end] == e.text
