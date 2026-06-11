@@ -7,6 +7,7 @@ from collections.abc import Iterable
 
 from ..entity_types import EMAIL
 from ..types import Entity
+from .base import regex_analyze
 
 # RFC 5322 完全準拠ではないが、実用上 99% のアドレスを拾える簡易パターン。
 # ローカル部: 英数 と . _ % + - を許容
@@ -18,14 +19,13 @@ class EmailRecognizer:
     """メールアドレス認識器。"""
 
     entity_type = EMAIL
+    name = "email"
 
     def analyze(self, text: str) -> Iterable[Entity]:
-        for m in _EMAIL_PATTERN.finditer(text):
-            yield Entity(
-                type=self.entity_type,
-                text=m.group(),
-                start=m.start(),
-                end=m.end(),
-                score=1.0,
-                recognizer="email",
-            )
+        return regex_analyze(
+            text,
+            entity_type=self.entity_type,
+            recognizer_name=self.name,
+            pattern=_EMAIL_PATTERN,
+            default_score=1.0,
+        )

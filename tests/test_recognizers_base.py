@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from fuseji.recognizers.base import (
@@ -9,6 +11,7 @@ from fuseji.recognizers.base import (
     normalize,
     normalize_digits,
     normalize_hyphens,
+    regex_analyze,
 )
 
 
@@ -78,3 +81,97 @@ class TestDefaultRecognizers:
     def test_各認識器は_analyze_を持つ(self) -> None:
         for r in default_recognizers():
             assert callable(r.analyze)
+
+    def test_各認識器は_name_属性を持つ(self) -> None:
+        # snake_case 識別子で Entity.recognizer に格納される
+        names = {r.name for r in default_recognizers()}
+        assert names == {"email", "credit_card", "my_number", "jp_phone", "jp_postal"}
+
+
+class TestRegexAnalyze:
+    def test_validate_なしのときは_default_score(self) -> None:
+        pattern = re.compile(r"\d{3}")
+        entities = list(
+            regex_analyze(
+                "abc 123 xyz",
+                entity_type="TEST",
+                recognizer_name="test",
+                pattern=pattern,
+                default_score=0.7,
+            )
+        )
+        assert len(entities) == 1
+        e = entities[0]
+        assert e.type == "TEST"
+        assert e.text == "123"
+        assert e.start == 4
+        assert e.end == 7
+        assert e.score == 0.7
+        assert e.recognizer == "test"
+
+    def test_validate_が_None_を返すと候補は除外される(self) -> None:
+        pattern = re.compile(r"\d+")
+
+        def reject_short(s: str) -> float | None:
+            return 0.9 if len(s) >= 3 else None
+
+        entities = list(
+            regex_analyze(
+                "1 22 333 4444",
+                entity_type="N",
+                recognizer_name="n",
+                pattern=pattern,
+                validate=reject_short,
+            )
+        )
+        assert [e.text for e in entities] == ["333", "4444"]
+        assert all(e.score == 0.9 for e in entities)
+
+    def test_normalize_fn_適用後にマッチするが元テキストの表層を返す(self) -> None:
+        # 全角数字を normalize 後にマッチさせる
+        pattern = re.compile(r"\d{3}")
+        entities = list(
+            regex_analyze(
+                "番号: １２３",
+                entity_type="N",
+                recognizer_name="n",
+                pattern=pattern,
+                normalize_fn=normalize,
+            )
+        )
+        assert len(entities) == 1
+        # 元テキストの表層形（全角）が返る
+        assert entities[0].text == "１２３"
+
+    def test_require_digit_boundary_で前後数字を除外(self) -> None:
+        pattern = re.compile(r"\d{3}")
+        entities = list(
+            regex_analyze(
+                "abc 1234 xyz",  # 4 桁の中の 3 桁は周辺数字あり
+                entity_type="N",
+                recognizer_name="n",
+                pattern=pattern,
+                require_digit_boundary=True,
+            )
+        )
+        assert entities == []
+
+    def test_strip_separators_before_validate_でハイフンを除去(self) -> None:
+        pattern = re.compile(r"\d(?:-\d){2}")
+        captured: list[str] = []
+
+        def capture(s: str) -> float | None:
+            captured.append(s)
+            return 0.9
+
+        list(
+            regex_analyze(
+                "1-2-3",
+                entity_type="N",
+                recognizer_name="n",
+                pattern=pattern,
+                validate=capture,
+                strip_separators_before_validate=True,
+            )
+        )
+        assert captured == ["123"]

@@ -6,6 +6,7 @@ from .base import (
     normalize,
     normalize_digits,
     normalize_hyphens,
+    regex_analyze,
 )
 
 __all__ = [
@@ -14,4 +15,5 @@ __all__ = [
     "normalize",
     "normalize_digits",
     "normalize_hyphens",
+    "regex_analyze",
 ]
