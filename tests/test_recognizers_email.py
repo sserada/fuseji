@@ -51,3 +51,30 @@ class TestEmailRecognizer:
         entities = list(EmailRecognizer().analyze(text))
         e = entities[0]
         assert text[e.start : e.end] == e.text
+
+
+class TestEmailUnicodeEdges:
+    """Unicode/絵文字/IDN の境界挙動 (#91)."""
+
+    def test_IDN_ドメインは現状検出されない(self) -> None:
+        # ローカル部・ドメイン部とも ASCII 限定の RFC-lite パターンなので、
+        # 日本語ドメイン (例: 日本語.jp) や Punycode 前の IDN は検出しない。
+        # IDN サポートは将来の Issue で別途検討する。
+        entities = list(EmailRecognizer().analyze("taro@日本語.jp"))
+        assert entities == []
+
+    def test_Punycode_は_ASCII_化されているので検出される(self) -> None:
+        # IDN の Punycode 表記は ASCII のため現行 regex でも拾える
+        entities = list(EmailRecognizer().analyze("taro@xn--wgv71a.jp"))
+        assert len(entities) == 1
+        assert entities[0].text == "taro@xn--wgv71a.jp"
+
+    def test_絵文字隣接でもオフセットが正しい(self) -> None:
+        # サロゲートペア (U+1F600) の前後でも Python の str はコードポイント
+        # 単位で扱うため start/end は安定する
+        text = "😀taro@example.com😀"
+        entities = list(EmailRecognizer().analyze(text))
+        assert len(entities) == 1
+        e = entities[0]
+        assert text[e.start : e.end] == e.text
+        assert e.text == "taro@example.com"
