@@ -7,11 +7,8 @@ import hashlib
 import pytest
 
 from fuseji.strategies import Hash, Placeholder, Redact
-from fuseji.types import Entity
 
-
-def _entity(type_: str, text: str, start: int, end: int) -> Entity:
-    return Entity(type=type_, text=text, start=start, end=end, score=1.0, recognizer="test")
+from .conftest import make_entity as _entity
 
 
 class TestPlaceholder:
