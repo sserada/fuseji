@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Iterator
 from typing import Protocol
 
 from ..types import Entity
@@ -33,7 +33,7 @@ class Recognizer(Protocol):
     entity_type: str
     name: str
 
-    def analyze(self, text: str, *, normalized: str | None = None) -> Iterable[Entity]: ...
+    def analyze(self, text: str, *, normalized: str | None = None) -> Iterator[Entity]: ...
 
 
 # --- 文字正規化テーブル ---

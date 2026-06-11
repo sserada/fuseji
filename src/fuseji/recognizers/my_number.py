@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable
+from collections.abc import Iterator
 
 from ..entity_types import MY_NUMBER
 from ..types import Entity
@@ -52,7 +52,7 @@ class MyNumberRecognizer:
     entity_type = MY_NUMBER
     name = "my_number"
 
-    def analyze(self, text: str, *, normalized: str | None = None) -> Iterable[Entity]:
+    def analyze(self, text: str, *, normalized: str | None = None) -> Iterator[Entity]:
         # 全角ハイフン類は \d{12} のマッチに影響しないため、normalize_digits ではなく
         # 全認識器共通の normalize（digits + hyphens）を使ってよい。
         # Masker 層の事前計算結果（normalized）と互換にすることで再正規化を回避できる。

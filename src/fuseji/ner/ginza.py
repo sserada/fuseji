@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from typing import TYPE_CHECKING
 
 from ..entity_types import PERSON
@@ -11,10 +11,14 @@ from ..types import Entity
 if TYPE_CHECKING:
     from spacy.language import Language
 
+# GiNZA が PERSON 検出に使うラベル名（GiNZA 独自表記、fuseji の
+# `entity_types.PERSON` とは別物）。spaCy / GiNZA のバージョンが上がって
+# 表記がブレた場合、ここを変えるだけで吸収できる。
+_GINZA_PERSON_LABEL: str = "Person"
 # GiNZA は OntoNotes ではなく GSK 風の独自ラベルを返す。
 # v0.1 では「Person」だけを採用し、他のラベル（Title_Other, Province 等）は
 # 利用側で明示的に指定したいときのみ拾う。
-_DEFAULT_LABELS: tuple[str, ...] = ("Person",)
+_DEFAULT_LABELS: tuple[str, ...] = (_GINZA_PERSON_LABEL,)
 
 
 class GinzaBackend:
@@ -51,7 +55,7 @@ class GinzaBackend:
     def labels(self) -> frozenset[str]:
         return frozenset(self._labels)
 
-    def analyze(self, text: str) -> Iterable[Entity]:
+    def analyze(self, text: str) -> Iterator[Entity]:
         if not text:
             return
         doc = self._nlp(text)
@@ -59,7 +63,7 @@ class GinzaBackend:
             if ent.label_ not in self._labels:
                 continue
             # GiNZA の "Person" → 慣用名 PERSON 定数に正規化
-            type_ = PERSON if ent.label_ == "Person" else ent.label_.upper()
+            type_ = PERSON if ent.label_ == _GINZA_PERSON_LABEL else ent.label_.upper()
             yield Entity(
                 type=type_,
                 text=ent.text,
