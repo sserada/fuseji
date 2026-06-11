@@ -66,8 +66,11 @@ jobs:
         run: uv python install 3.13
       - name: Install all extras (ginza + server)
         run: uv sync --all-extras
-      - name: pytest (all extras)
-        run: uv run pytest -q
+      # all-extras 環境では server/ginza モジュールもカバレッジ計測されるため、
+      # 90% gate を本ジョブだけで適用する（core matrix は server/ginza を除外し
+      # ても全体率が下がるので gate を付けない）。
+      - name: pytest (all extras + coverage gate)
+        run: uv run pytest -q --cov-fail-under=90
 
   bench:
     name: bench (informational)
