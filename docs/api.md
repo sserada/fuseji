@@ -171,7 +171,12 @@ class Vault(Protocol):
 class InMemoryVault:
     DEFAULT_EXCLUDED_TYPES: frozenset[str] = frozenset({"MY_NUMBER", "CREDIT_CARD"})
 
-    def __init__(self, excluded_types: Iterable[str] | None = None) -> None: ...
+    def __init__(
+        self,
+        excluded_types: Iterable[str] | None = None,
+        *,
+        max_size: int | None = None,
+    ) -> None: ...
 
     @property
     def excluded_types(self) -> frozenset[str]: ...
@@ -191,6 +196,7 @@ class InMemoryVault:
   - `MY_NUMBER` は番号法対応で復元を許さない
   - `CREDIT_CARD` は PCI DSS Requirement 3.4/3.5 整合で PAN を mapping に残さない
 - `excluded_types` を空指定で除外集合自体を無効化することは可能（法令／コンプライアンス上の責任は利用者側に帰属）
+- `max_size` を指定すると登録済み placeholder 数の上限を設け、超過時は FIFO で最古エントリを退避する。長時間稼働サーバーでのメモリ無制限成長を抑止する DoS 緩和策（#86）。`max_size=None`（デフォルト）は無制限
 - `assign` は内部 `threading.Lock` で保護されており、Uvicorn の thread pool 経由で並行に呼ばれても安全
 
 ---

@@ -289,3 +289,71 @@ class TestVaultProtocol:
         v.assign("PERSON", "山田")
         assert v.get("<PERSON_1>") == "山田"
         assert v.restore("<PERSON_1>") == "山田"
+
+
+class TestMaxSize:
+    """max_size による FIFO eviction の挙動 (#86)."""
+
+    def test_max_size_未指定なら無制限(self) -> None:
+        v = InMemoryVault()
+        for i in range(50):
+            v.assign("PERSON", f"surface{i}")
+        assert v.size == 50
+
+    def test_max_size_到達後は_FIFO_で最古を退避(self) -> None:
+        v = InMemoryVault(max_size=3)
+        v.assign("PERSON", "A")  # <PERSON_1>
+        v.assign("PERSON", "B")  # <PERSON_2>
+        v.assign("PERSON", "C")  # <PERSON_3>
+        assert v.size == 3
+        v.assign("PERSON", "D")  # <PERSON_4>, A が退避される
+        assert v.size == 3
+        # A は退避されたので restore できない
+        assert v.get("<PERSON_1>") is None
+        # B/C/D は残る
+        assert v.get("<PERSON_2>") == "B"
+        assert v.get("<PERSON_3>") == "C"
+        assert v.get("<PERSON_4>") == "D"
+
+    def test_退避後も新規番号は単調増加(self) -> None:
+        # FIFO で退避した番号は再利用しない（restore 時の衝突防止）
+        v = InMemoryVault(max_size=2)
+        v.assign("PERSON", "A")  # <PERSON_1>
+        v.assign("PERSON", "B")  # <PERSON_2>
+        v.assign("PERSON", "C")  # <PERSON_3> (A 退避)
+        v.assign("PERSON", "D")  # <PERSON_4> (B 退避)
+        # A/B の placeholder は退避済み、新規は 3 以上
+        assert v.get("<PERSON_3>") == "C"
+        assert v.get("<PERSON_4>") == "D"
+
+    def test_既存_surface_への_assign_は退避を発火しない(self) -> None:
+        v = InMemoryVault(max_size=2)
+        v.assign("PERSON", "A")
+        v.assign("PERSON", "B")
+        # 既存 surface の再 assign は新規エントリを作らない
+        v.assign("PERSON", "A")  # cache hit、新規挿入しない
+        assert v.size == 2
+        assert v.get("<PERSON_1>") == "A"
+        assert v.get("<PERSON_2>") == "B"
+
+    def test_max_size_0_以下は_InvalidConfigError(self) -> None:
+        import pytest
+
+        from fuseji.exceptions import InvalidConfigError
+
+        with pytest.raises(InvalidConfigError):
+            InMemoryVault(max_size=0)
+        with pytest.raises(InvalidConfigError):
+            InMemoryVault(max_size=-1)
+
+    def test_clear_後も_max_size_が維持される(self) -> None:
+        v = InMemoryVault(max_size=2)
+        v.assign("PERSON", "A")
+        v.assign("PERSON", "B")
+        v.clear()
+        assert v.size == 0
+        # clear 後も max_size は維持
+        v.assign("PERSON", "C")
+        v.assign("PERSON", "D")
+        v.assign("PERSON", "E")
+        assert v.size == 2  # max_size 上限が引き続き効く
