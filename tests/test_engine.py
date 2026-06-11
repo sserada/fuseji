@@ -129,6 +129,92 @@ class TestMaskerMask:
         assert types == {"EMAIL", "JP_PHONE_NUMBER", "JP_POSTAL_CODE"}
 
 
+class TestNormalizedDispatch:
+    """Masker が事前正規化済みテキストを認識器に渡す挙動 (#24)."""
+
+    def test_normalized_kwarg_を受ける認識器に渡される(self) -> None:
+        # normalized を観測する認識器
+        observed: dict[str, str | None] = {}
+
+        class ObservingRecognizer:
+            entity_type = "X"
+            name = "x"
+
+            def analyze(self, text: str, *, normalized: str | None = None) -> Iterable[Entity]:
+                observed["normalized"] = normalized
+                return iter([])
+
+        m = Masker(recognizers=[ObservingRecognizer()])
+        m.detect("０９０ー１２３４")
+        # normalize(text) = "090-1234"（数字＋ハイフン正規化）が渡る
+        assert observed["normalized"] == "090-1234"
+
+    def test_kwarg_未対応の認識器には_text_のみで呼ばれる(self) -> None:
+        called_with: dict[str, object] = {}
+
+        class LegacyRecognizer:
+            entity_type = "Y"
+            name = "y"
+
+            def analyze(self, text: str) -> Iterable[Entity]:
+                called_with["text"] = text
+                called_with["has_kwarg"] = False
+                return iter([])
+
+        m = Masker(recognizers=[LegacyRecognizer()])
+        m.detect("テストテキスト")
+        assert called_with["text"] == "テストテキスト"
+        # kwarg 未対応認識器のみの場合、normalize 計算自体スキップされる
+        assert not m._accepts_normalized[0]
+
+    def test_全認識器が_kwarg_未対応なら_normalize_を計算しない(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import fuseji.engine
+
+        class LegacyRecognizer:
+            entity_type = "Z"
+            name = "z"
+
+            def analyze(self, text: str) -> Iterable[Entity]:
+                return iter([])
+
+        calls = {"count": 0}
+        original_normalize = fuseji.engine.normalize
+
+        def counting(t: str) -> str:
+            calls["count"] += 1
+            return original_normalize(t)
+
+        monkeypatch.setattr(fuseji.engine, "normalize", counting)
+        m = Masker(recognizers=[LegacyRecognizer()])
+        m.detect("テスト")
+        assert calls["count"] == 0
+
+    def test_デフォルト認識器でも検出結果が従来と同じ(self) -> None:
+        # 既存挙動の互換性確認
+        text = "メール a@b.com 電話 ０９０ー１２３４ー５６７８ 郵便〒１２３ー４５６７"
+        result = Masker().detect(text)
+        types = {e.type for e in result}
+        assert types == {"EMAIL", "JP_PHONE_NUMBER", "JP_POSTAL_CODE"}
+
+    def test_VAR_KEYWORD_も_normalized_対応とみなす(self) -> None:
+        captured: dict[str, object] = {}
+
+        class KwargsRecognizer:
+            entity_type = "W"
+            name = "w"
+
+            def analyze(self, text: str, **kwargs: object) -> Iterable[Entity]:
+                captured.update(kwargs)
+                return iter([])
+
+        m = Masker(recognizers=[KwargsRecognizer()])
+        m.detect("０９０")
+        assert "normalized" in captured
+        assert captured["normalized"] == "090"
+
+
 class TestVaultStrategyConflict:
     def test_vault_と_strategy_同時指定で_UserWarning(self) -> None:
         """vault が strategy より優先されることを警告で明示."""

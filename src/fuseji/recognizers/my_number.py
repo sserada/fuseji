@@ -7,7 +7,7 @@ from collections.abc import Iterable
 
 from ..entity_types import MY_NUMBER
 from ..types import Entity
-from .base import normalize_digits, regex_analyze
+from .base import normalize, regex_analyze
 
 # マイナンバーは 12 桁、セパレーターは使用しないのが標準的
 _MY_NUMBER_PATTERN = re.compile(r"\d{12}")
@@ -52,13 +52,17 @@ class MyNumberRecognizer:
     entity_type = MY_NUMBER
     name = "my_number"
 
-    def analyze(self, text: str) -> Iterable[Entity]:
+    def analyze(self, text: str, *, normalized: str | None = None) -> Iterable[Entity]:
+        # 全角ハイフン類は \d{12} のマッチに影響しないため、normalize_digits ではなく
+        # 全認識器共通の normalize（digits + hyphens）を使ってよい。
+        # Masker 層の事前計算結果（normalized）と互換にすることで再正規化を回避できる。
         return regex_analyze(
             text,
             entity_type=self.entity_type,
             recognizer_name=self.name,
             pattern=_MY_NUMBER_PATTERN,
             validate=_validate,
-            normalize_fn=normalize_digits,
+            normalize_fn=normalize,
+            normalized=normalized,
             require_digit_boundary=True,
         )

@@ -65,16 +65,17 @@ class UsZipRecognizer:
     entity_type = "ZIP_CODE_US"
     name = "us_zip"
 
-    def analyze(self, text):
+    def analyze(self, text, *, normalized=None):
         return regex_analyze(
             text,
             entity_type=self.entity_type,
             recognizer_name=self.name,
             pattern=_US_ZIP_PATTERN,
             default_score=0.9,
+            normalized=normalized,  # Masker 層の事前正規化を活用
             # 検証関数を渡す場合（None を返すと候補を除外）
             # validate=my_validator,
-            # 前処理で正規化したい場合
+            # 前処理で正規化したい場合（normalized 未指定時のフォールバック）
             # normalize_fn=normalize,
             # 前後が数字なら除外（ID の一部とみなす）
             # require_digit_boundary=True,
