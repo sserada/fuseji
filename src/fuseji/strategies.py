@@ -53,6 +53,11 @@ class Placeholder:
 
     同一表層形には同一番号を振る。番号は entity type ごとに独立。
     例: `<PERSON_1>`, `<PERSON_2>`, `<EMAIL_1>`。
+
+    Example:
+        >>> from fuseji import Masker, Placeholder
+        >>> Masker(strategy=Placeholder()).mask("a@b.com と c@d.com").text
+        '<EMAIL_1> と <EMAIL_2>'
     """
 
     def mask(self, text: str, entities: Sequence[Entity]) -> tuple[str, Mapping[str, str]]:
@@ -74,7 +79,15 @@ class Placeholder:
 
 @dataclass(frozen=True, slots=True)
 class Redact:
-    """固定文字列で置換する戦略。対応表は持たない。"""
+    """固定文字列で置換する戦略。対応表は持たない。
+
+    Example:
+        >>> from fuseji import Masker, Redact
+        >>> Masker(strategy=Redact()).mask("a@b.com").text
+        '[REDACTED]'
+        >>> Masker(strategy=Redact(replacement="***")).mask("a@b.com").text
+        '***'
+    """
 
     replacement: str = "[REDACTED]"
 
@@ -118,6 +131,12 @@ class Hash:
 
     同一表層形は同一ハッシュとなり、ログ上で分析しつつ原文は伏せられる。
     対応表は hash → 元テキストを持つ（一方向だが既知集合からの逆引きは可能）。
+
+    Example:
+        >>> from fuseji import Masker, Hash
+        >>> result = Masker(strategy=Hash(length=8)).mask("a@b.com")
+        >>> len(result.text)  # 8 文字のハッシュ
+        8
     """
 
     length: int = 8
