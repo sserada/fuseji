@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import TYPE_CHECKING
 
+from ..entity_types import PERSON
 from ..types import Entity
 
 if TYPE_CHECKING:
@@ -57,8 +58,8 @@ class GinzaBackend:
         for ent in doc.ents:
             if ent.label_ not in self._labels:
                 continue
-            # GiNZA の "Person" → 慣用名 "PERSON" に正規化
-            type_ = "PERSON" if ent.label_ == "Person" else ent.label_.upper()
+            # GiNZA の "Person" → 慣用名 PERSON 定数に正規化
+            type_ = PERSON if ent.label_ == "Person" else ent.label_.upper()
             yield Entity(
                 type=type_,
                 text=ent.text,
