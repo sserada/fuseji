@@ -21,8 +21,11 @@ class TestPublicApi:
     def test___all___に主要シンボルが含まれる(self) -> None:
         expected = {
             "Entity",
+            "FusejiError",
             "Hash",
             "InMemoryVault",
+            "InvalidConfigError",
+            "InvalidEntityError",
             "MaskResult",
             "MaskStrategy",
             "Masker",
@@ -32,6 +35,25 @@ class TestPublicApi:
             "__version__",
         }
         assert set(fuseji.__all__) == expected
+
+    def test_例外階層が_FusejiError_でも_ValueError_でも拾える(self) -> None:
+        # InvalidEntityError は FusejiError かつ ValueError の多重継承
+        try:
+            fuseji.Entity(type="X", text="a", start=-1, end=0, score=0.5, recognizer="r")
+        except fuseji.FusejiError as e:
+            assert isinstance(e, fuseji.InvalidEntityError)
+            assert isinstance(e, ValueError)
+        else:
+            raise AssertionError("例外が発生しなかった")
+
+        # 既存コードの except ValueError もそのまま動く（互換性）
+        try:
+            fuseji.Hash(length=0)
+        except ValueError as e:
+            assert isinstance(e, fuseji.InvalidConfigError)
+            assert isinstance(e, fuseji.FusejiError)
+        else:
+            raise AssertionError("例外が発生しなかった")
 
     def test_quickstart_動作(self) -> None:
         # README に載せる想定のクイックスタート
