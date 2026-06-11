@@ -215,6 +215,66 @@ class TestNormalizedDispatch:
         assert captured["normalized"] == "090"
 
 
+class TestCrossRecognizerOverlap:
+    """デフォルト認識器セットでのクロス認識器干渉・境界判定の回帰テスト (#89).
+
+    `_resolve_overlaps` + `require_digit_boundary` の組合せで意図された挙動が、
+    リファクタや認識器変更で黙って壊れていないことを保証する。
+    """
+
+    def test_16桁_CC_は_内部の_12桁_MN_候補を吸収する(self) -> None:
+        # `4242424242424242` は Luhn 通過の 16 桁 CC。内部の任意 12 桁部分は
+        # MyNumberRecognizer の \d{12} パターンにマッチし得るが、
+        # require_digit_boundary=True で前後数字を見て除外される（→ MN は発火しない）。
+        result = Masker().detect("カード番号 4242424242424242 です")
+        types = {e.type for e in result}
+        assert types == {"CREDIT_CARD"}
+        assert len(result) == 1
+
+    def test_CC_と_MN_が_スペース区切りで隣接した場合は_独立に検出される(self) -> None:
+        # `4242424242424242` (Luhn 通過 CC) と `123456789018` (12 桁 MN)
+        # の間にスペースが入れば、digit boundary が崩れないので両方発火する。
+        result = Masker().detect("カード 4242424242424242 番号 123456789018")
+        types = {e.type for e in result}
+        assert types == {"CREDIT_CARD", "MY_NUMBER"}
+
+    def test_フリーダイヤルと_MN_が隣接しても_独立検出される(self) -> None:
+        # 0120-555-7890（11 桁フリーダイヤル）と 234567890123（12 桁 MN）が
+        # 短いテキストに同居しても、それぞれ独立に検出される。
+        result = Masker().detect("連絡先 0120-555-7890 番号 234567890123")
+        types = {e.type for e in result}
+        assert types == {"JP_PHONE_NUMBER", "MY_NUMBER"}
+
+    def test_全角ハイフン混在で複数認識器が独立発火する(self) -> None:
+        # 携帯電話番号（全角数字＋全角ハイフン）と 12 桁 MN（全角数字）の組合せ
+        text = "TEL: ０９０ー１２３４ー５６７８ ID: ５６７８９０１２３４５６"
+        result = Masker().detect(text)
+        types = {e.type for e in result}
+        assert types == {"JP_PHONE_NUMBER", "MY_NUMBER"}
+
+    def test_CC_と_MN_が_セパレーターなしで連結したら_どちらも発火しない(self) -> None:
+        # 16 桁 CC 直後に 12 桁 MN を連結した 28 桁数字列は、CC パターンの
+        # 上限（19 桁）を超え、MN の digit boundary 判定で前後数字あり扱いとなり
+        # 双方除外される（fail-closed 寄りの安全側挙動）。
+        result = Masker().detect("4242424242424242123456789018")
+        assert result == ()
+
+    def test_メールアドレス内の数字列は_他認識器に拾われない(self) -> None:
+        # `user1234567890@example.com` のローカル部に 10 桁数字が含まれるが、
+        # EMAIL の方が長い span で勝つ（オーバーラップ解決）。
+        result = Masker().detect("メール user1234567890@example.com まで")
+        types = {e.type for e in result}
+        assert "EMAIL" in types
+        assert "JP_PHONE_NUMBER" not in types
+
+    def test_郵便番号と電話番号が混在しても両方検出される(self) -> None:
+        # 〒形式の郵便番号と固定電話 10 桁が混在
+        result = Masker().detect("〒123-4567 東京都… 03-1234-5678")
+        types = {e.type for e in result}
+        assert "JP_POSTAL_CODE" in types
+        assert "JP_PHONE_NUMBER" in types
+
+
 class TestVaultStrategyConflict:
     def test_vault_と_strategy_同時指定で_UserWarning(self) -> None:
         """vault が strategy より優先されることを警告で明示."""
