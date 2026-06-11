@@ -135,6 +135,33 @@ class TestRestore:
         assert v.restore("<PERSON_1>") == "<PERSON_1>"
 
 
+class TestClear:
+    def test_clear_は全てのマッピングを破棄(self) -> None:
+        v = InMemoryVault()
+        v.assign("PERSON", "山田")
+        v.assign("EMAIL", "a@b.com")
+        v.clear()
+        assert v.get("<PERSON_1>") is None
+        assert v.get("<EMAIL_1>") is None
+        assert v.restore("<PERSON_1>") == "<PERSON_1>"  # 素通し
+
+    def test_clear_後はカウンタも_1_から再開(self) -> None:
+        v = InMemoryVault()
+        v.assign("PERSON", "山田")
+        v.assign("PERSON", "佐藤")
+        assert v.assign("PERSON", "田中") == "<PERSON_3>"
+        v.clear()
+        assert v.assign("PERSON", "鈴木") == "<PERSON_1>"
+
+    def test_clear_は_excluded_types_設定を保持(self) -> None:
+        v = InMemoryVault(excluded_types=["EMAIL"])
+        v.assign("PERSON", "山田")
+        v.clear()
+        # excluded_types は維持されたまま
+        assert "EMAIL" in v.excluded_types
+        assert v.assign("EMAIL", "x@y.z") is None
+
+
 class TestThreadSafety:
     def test_並行_assign_でも採番衝突しない(self) -> None:
         """複数スレッドで同じ surface を assign しても placeholder は 1 つに収束."""
