@@ -5,7 +5,7 @@ from .strategies import Hash, MaskStrategy, Placeholder, Redact
 from .types import Entity, MaskResult
 from .vault import InMemoryVault, Vault
 
-__version__ = "0.0.0"
+__version__ = "0.1.0"
 
 __all__ = [
     "Entity",
