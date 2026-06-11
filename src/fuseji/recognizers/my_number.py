@@ -6,7 +6,7 @@ import re
 from collections.abc import Iterable
 
 from ..types import Entity
-from .base import normalize_digits
+from .base import has_digit_boundary, normalize_digits
 
 # マイナンバーは 12 桁、セパレーターは使用しないのが標準的
 _MY_NUMBER_PATTERN = re.compile(r"\d{12}")
@@ -51,9 +51,7 @@ class MyNumberRecognizer:
             start = m.start()
             end = m.end()
             # 直前・直後に数字がある場合は別 ID の一部の可能性が高いので除外
-            if start > 0 and normalized[start - 1].isdigit():
-                continue
-            if end < len(normalized) and normalized[end].isdigit():
+            if has_digit_boundary(normalized, start, end):
                 continue
             score = 0.95 if _is_valid_my_number(m.group()) else 0.5
             yield Entity(

@@ -6,7 +6,7 @@ import re
 from collections.abc import Iterable
 
 from ..types import Entity
-from .base import normalize
+from .base import has_digit_boundary, normalize
 
 # 〒 + 任意の空白 + 7 桁（ハイフン任意）
 _POSTAL_WITH_MARK = re.compile(r"〒\s*\d{3}-?\d{4}")
@@ -59,9 +59,7 @@ class JpPostalRecognizer:
             if any(s <= start and end <= e for s, e in emitted_spans):
                 continue
             # 周辺が数字なら別 ID とみなす
-            if start > 0 and normalized[start - 1].isdigit():
-                continue
-            if end < len(normalized) and normalized[end].isdigit():
+            if has_digit_boundary(normalized, start, end):
                 continue
             score = 0.9 if _has_context(normalized, start, end) else 0.6
             yield Entity(

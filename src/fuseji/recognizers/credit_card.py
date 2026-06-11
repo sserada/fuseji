@@ -6,11 +6,10 @@ import re
 from collections.abc import Iterable
 
 from ..types import Entity
-from .base import normalize
+from .base import SEPARATOR_PATTERN, normalize
 
 # 13-19 桁の数字、間に任意のハイフン or 空白を許容
 _CC_PATTERN = re.compile(r"\d(?:[-\s]?\d){12,18}")
-_SEPARATOR_PATTERN = re.compile(r"[-\s]")
 
 
 def _luhn(digits: str) -> bool:
@@ -40,7 +39,7 @@ class CreditCardRecognizer:
         # 全角数字・全角ハイフンを正規化（1 文字 ↔ 1 文字なのでオフセット維持）
         normalized = normalize(text)
         for m in _CC_PATTERN.finditer(normalized):
-            digits = _SEPARATOR_PATTERN.sub("", m.group())
+            digits = SEPARATOR_PATTERN.sub("", m.group())
             if not 13 <= len(digits) <= 19:
                 continue
             if not _luhn(digits):
