@@ -128,6 +128,14 @@ curl -X POST http://localhost:8000/mask \
 
 OpenAPI: `http://localhost:8000/openapi.json`
 
+### Operational limits
+
+| Limit | Default | Env var / API | On overflow |
+| --- | --- | --- | --- |
+| Request body size | 1 MB | `FUSEJI_SERVER_MAX_BODY_BYTES` / `create_app(max_body_bytes=...)` | HTTP 413 |
+| Per-request processing time | 30 s | `FUSEJI_SERVER_TIMEOUT_SECONDS` / `create_app(timeout_seconds=...)` | HTTP 504 |
+| `mask_json` recursion depth | 100 | `Masker(max_json_depth=...)` | fail-closed with `"[fuseji: too deep]"` |
+
 ## Security and legal notes
 
 fuseji follows **detect, never retain**:

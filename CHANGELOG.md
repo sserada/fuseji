@@ -25,6 +25,13 @@
   4 回呼ばれていた `str.translate` フルスキャンが 1 回に削減される。
   カスタム認識器との後方互換性は `inspect.signature` ベースのオプトイン検出で確保（#24）
 
+### Security
+
+- `fuseji.server.app.RequestTimeoutMiddleware` を追加。/mask /detect エンドポイントの
+  1 リクエストあたり処理時間に上限を設け、超過時は HTTP 504 を返す。デフォルト 30 秒、
+  環境変数 `FUSEJI_SERVER_TIMEOUT_SECONDS` または `create_app(timeout_seconds=...)`
+  で設定可能。長文 + 多数 entity による占有を防ぐ DoS 緩和策（#29）
+
 ## [0.1.0] - 2026-06-12
 
 初回 PyPI リリース。日本語特化の PII 検出・マスキングミドルウェア。
