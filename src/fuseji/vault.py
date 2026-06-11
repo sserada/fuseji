@@ -36,6 +36,10 @@ class Vault(Protocol):
         """text 中の登録済み placeholder を元 surface に置換して返す。"""
         ...
 
+    def clear(self) -> None:
+        """すべての placeholder マッピングを破棄し、空の状態に戻す。"""
+        ...
+
 
 class InMemoryVault:
     """インメモリ実装の Vault。
@@ -119,3 +123,29 @@ class InMemoryVault:
             lambda m: self._placeholder_to_surface.get(m.group(), m.group()),
             text,
         )
+
+    def clear(self) -> None:
+        """すべての placeholder マッピングと番号カウンタを破棄して空の状態に戻す。
+
+        セッション境界の明示的なリセット、長時間稼働サーバーでの定期的な
+        メモリ解放、テスト間でインスタンスを使い回す場合などに使う。
+
+        `excluded_types` の設定は維持される（再構築不要）。
+
+        Thread-safety: `assign` と同じ Lock で保護されているため並行呼び出し
+        中に部分的な状態が観測されることはない。
+
+        Example:
+            >>> from fuseji import InMemoryVault
+            >>> v = InMemoryVault()
+            >>> v.assign("PERSON", "山田")
+            '<PERSON_1>'
+            >>> v.clear()
+            >>> v.get("<PERSON_1>")  # クリア後は未登録扱い
+            >>> v.assign("PERSON", "佐藤")  # カウンタも 1 から再開
+            '<PERSON_1>'
+        """
+        with self._lock:
+            self._counters.clear()
+            self._surface_to_placeholder.clear()
+            self._placeholder_to_surface.clear()
