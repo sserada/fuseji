@@ -5,6 +5,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 
+from .exceptions import InvalidEntityError
+
 
 @dataclass(frozen=True, slots=True)
 class Entity:
@@ -28,13 +30,13 @@ class Entity:
 
     def __post_init__(self) -> None:
         if self.start < 0:
-            raise ValueError(f"start は非負である必要がある: {self.start}")
+            raise InvalidEntityError(f"start は非負である必要がある: {self.start}")
         if self.end < self.start:
-            raise ValueError(
+            raise InvalidEntityError(
                 f"end は start 以上である必要がある: start={self.start}, end={self.end}"
             )
         if not 0.0 <= self.score <= 1.0:
-            raise ValueError(f"score は 0.0–1.0 の範囲: {self.score}")
+            raise InvalidEntityError(f"score は 0.0–1.0 の範囲: {self.score}")
 
 
 @dataclass(frozen=True, slots=True)

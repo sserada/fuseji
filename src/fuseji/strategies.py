@@ -7,6 +7,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 
+from .exceptions import InvalidConfigError
 from .types import Entity
 
 if TYPE_CHECKING:
@@ -123,7 +124,7 @@ class Hash:
 
     def __post_init__(self) -> None:
         if not 1 <= self.length <= 64:
-            raise ValueError(f"length は 1–64 の範囲: {self.length}")
+            raise InvalidConfigError(f"length は 1–64 の範囲: {self.length}")
 
     def mask(self, text: str, entities: Sequence[Entity]) -> tuple[str, Mapping[str, str]]:
         surface_to_hash: dict[str, str] = {}
