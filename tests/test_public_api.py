@@ -32,6 +32,7 @@ class TestPublicApi:
             "Placeholder",
             "Redact",
             "Vault",
+            "VaultStrategy",
             "__version__",
         }
         assert set(fuseji.__all__) == expected

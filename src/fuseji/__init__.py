@@ -2,7 +2,7 @@
 
 from .engine import Masker
 from .exceptions import FusejiError, InvalidConfigError, InvalidEntityError
-from .strategies import Hash, MaskStrategy, Placeholder, Redact
+from .strategies import Hash, MaskStrategy, Placeholder, Redact, VaultStrategy
 from .types import Entity, MaskResult
 from .vault import InMemoryVault, Vault
 
@@ -21,5 +21,6 @@ __all__ = [
     "Placeholder",
     "Redact",
     "Vault",
+    "VaultStrategy",
     "__version__",
 ]
