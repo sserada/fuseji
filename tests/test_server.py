@@ -147,3 +147,68 @@ class TestCreateAppFactory:
         c1 = TestClient(app)
         c2 = TestClient(custom_app)
         assert c1.get("/healthz").json() == c2.get("/healthz").json() == {"status": "ok"}
+
+
+class TestRequestTimeout:
+    """RequestTimeoutMiddleware の挙動 (#29)."""
+
+    def test_デフォルト_30s_では通常リクエストが通る(self, client: TestClient) -> None:
+        # 既定 30s 内で完了する軽量リクエスト
+        res = client.post("/mask", json={"data": "hello"})
+        assert res.status_code == 200
+
+    def test_タイムアウト超過で_504_を返す(self) -> None:
+        """マスカーをスタブ化し、確実に timeout 発火する状況を作る."""
+        import time
+
+        from fuseji import Masker
+        from fuseji.server.app import create_app
+
+        class _SlowMasker:
+            """50ms スリープしてからマスクするスタブ。"""
+
+            def __init__(self) -> None:
+                self._inner = Masker()
+
+            def mask_json(self, data: object) -> object:
+                time.sleep(0.05)
+                return self._inner.mask_json(data)
+
+            def detect(self, text: str) -> object:
+                time.sleep(0.05)
+                return self._inner.detect(text)
+
+        # 1ms タイムアウトで確実に超過させる
+        slow_app = create_app(masker=_SlowMasker(), timeout_seconds=0.001)  # type: ignore[arg-type]
+        c = TestClient(slow_app)
+        res = c.post("/mask", json={"data": "hello"})
+        assert res.status_code == 504
+        assert res.json()["detail"] == "request timeout"
+
+    def test_create_app_でカスタム_timeout_seconds_を指定できる(self) -> None:
+        from fuseji.server.app import create_app
+
+        app_with_timeout = create_app(timeout_seconds=10.0)
+        c = TestClient(app_with_timeout)
+        res = c.get("/healthz")
+        assert res.status_code == 200  # 通常リクエストは通る
+
+    def test_環境変数で_timeout_を上書きできる(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from fuseji.server.app import _timeout_seconds_from_env
+
+        monkeypatch.setenv("FUSEJI_SERVER_TIMEOUT_SECONDS", "5.5")
+        assert _timeout_seconds_from_env() == 5.5
+
+    def test_不正な環境変数値はデフォルトにフォールバック(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from fuseji.server.app import DEFAULT_TIMEOUT_SECONDS, _timeout_seconds_from_env
+
+        monkeypatch.setenv("FUSEJI_SERVER_TIMEOUT_SECONDS", "not-a-number")
+        assert _timeout_seconds_from_env() == DEFAULT_TIMEOUT_SECONDS
+
+    def test_負の値はデフォルトにフォールバック(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from fuseji.server.app import DEFAULT_TIMEOUT_SECONDS, _timeout_seconds_from_env
+
+        monkeypatch.setenv("FUSEJI_SERVER_TIMEOUT_SECONDS", "-1")
+        assert _timeout_seconds_from_env() == DEFAULT_TIMEOUT_SECONDS

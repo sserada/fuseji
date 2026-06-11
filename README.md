@@ -140,6 +140,14 @@ curl -X POST http://localhost:8000/detect \
 
 OpenAPI スキーマ: `http://localhost:8000/openapi.json`
 
+### 運用上の上限値
+
+| 制限 | デフォルト | 環境変数 / API | 超過時の挙動 |
+| --- | --- | --- | --- |
+| リクエストボディサイズ | 1 MB | `FUSEJI_SERVER_MAX_BODY_BYTES` / `create_app(max_body_bytes=...)` | HTTP 413 |
+| 1 リクエストあたり処理時間 | 30 秒 | `FUSEJI_SERVER_TIMEOUT_SECONDS` / `create_app(timeout_seconds=...)` | HTTP 504 |
+| `mask_json` 再帰深度 | 100 | `Masker(max_json_depth=...)` | `"[fuseji: too deep]"` で fail-closed |
+
 ## セキュリティ・法令上の注意
 
 fuseji は **検出・破棄するが保持しない（detect, never retain）** ことを設計原則としています。
