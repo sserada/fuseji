@@ -101,9 +101,17 @@ quote-style = "double"
 [tool.pytest.ini_options]
 # テストファイル: tests/test_*.py + tests/bench/bench_*.py の両方を収集する
 python_files = ["test_*.py", "bench_*.py"]
-# bench はデフォルトでは時間計測を無効化（lint/test ジョブでの実行時間を節約）。
-# 明示的に `--benchmark-enable` を渡したときのみ計測する。
-addopts = "--benchmark-disable"
+# 通常のテストに加えて src/fuseji 配下の doctest（公開 API の Example セクション）も
+# 収集対象に含める。README/docstring の使用例の回帰を防ぐ。
+# core matrix（extras なし）では conftest.py が server/ginza を doctest 収集から除外。
+testpaths = ["tests", "src/fuseji"]
+# - bench はデフォルトでは時間計測を無効化（lint/test ジョブでの実行時間を節約）。
+#   明示的に `--benchmark-enable` を渡したときのみ計測する。
+# - `--doctest-modules` で src/fuseji 配下の docstring 内 Example を doctest として実行。
+# - coverage はレポートのみ。`--cov-fail-under` ゲートは all-extras を持つ CI ジョブで
+#   付与する（core matrix では server/ginza のステートメントを実行できないため、
+#   全体での gate は test-extras ジョブに限定する）。
+addopts = "--benchmark-disable --doctest-modules --cov=src/fuseji --cov-report=term-missing"
 
 [tool.mypy]
 python_version = "3.10"
