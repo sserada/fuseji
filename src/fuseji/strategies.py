@@ -113,10 +113,27 @@ class VaultStrategy:
     vault: Vault
 
     def mask(self, text: str, entities: Sequence[Entity]) -> tuple[str, Mapping[str, str]]:
+        if not entities:
+            return text, {}
+        # ユニーク化した (type, surface) を 1 回の assign_many で一括採番し、
+        # k 回の lock 取得を 1 回に縮約する（#97）。同一 surface の重複は
+        # mapping の整合性を保つため事前に除去する。
+        seen: dict[tuple[str, str], int] = {}
+        unique_pairs: list[tuple[str, str]] = []
+        for e in entities:
+            key = (e.type, e.text)
+            if key not in seen:
+                seen[key] = len(unique_pairs)
+                unique_pairs.append(key)
+        assigned = self.vault.assign_many(unique_pairs)
+        # (type, surface) → placeholder（excluded type のときは None）
+        ph_by_key: dict[tuple[str, str], str | None] = {
+            unique_pairs[i]: assigned[i] for i in range(len(unique_pairs))
+        }
         replacements: list[tuple[int, int, str]] = []
         mapping: dict[str, str] = {}
         for e in entities:
-            ph = self.vault.assign(e.type, e.text)
+            ph = ph_by_key[(e.type, e.text)]
             if ph is None:
                 ph = f"<{e.type}>"
             else:
