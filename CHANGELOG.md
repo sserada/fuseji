@@ -86,6 +86,11 @@
 
 ### Security
 
+- サーバーモードに API キー認証と CORS 制御を追加（#83、opt-in）:
+  - `create_app(api_key="...")` または環境変数 `FUSEJI_API_KEY` で API キーを設定すると、`X-API-Key` ヘッダによる timing-safe な認証が有効化される
+  - `/mask` と `/detect` は保護対象、`/healthz` と OpenAPI は未認証で叩ける（ヘルスチェック / ドキュメント生成のため）
+  - `create_app(cors_origins=[...])` または環境変数 `FUSEJI_CORS_ORIGINS`（カンマ区切り）で CORS allow_origins を設定すると `starlette.middleware.cors.CORSMiddleware` が組み込まれる
+  - デフォルトはどちらも `None`（無認証、CORS 無効、v0.1 互換）。インターネット公開時は両方の設定を強く推奨
 - `BodySizeLimitMiddleware` を pure ASGI middleware に書き換え、chunked リクエストでも上限を強制（#87）:
   - Content-Length 宣言の有無に関わらず body stream を逐次読み取り、累積バイト数が `max_bytes` を超えた時点で下流アプリにボディを渡さず 413 を返す
   - chunked transfer-encoding / HTTP/2 / Content-Length 省略経路の DoS を遮断

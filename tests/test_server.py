@@ -290,3 +290,134 @@ class TestRequestTimeout:
 
         monkeypatch.setenv("FUSEJI_SERVER_TIMEOUT_SECONDS", "-1")
         assert _timeout_seconds_from_env() == DEFAULT_TIMEOUT_SECONDS
+
+
+class TestApiKeyAuth:
+    """ApiKeyAuthMiddleware の挙動 (#83)."""
+
+    def test_api_key_未設定なら_誰でも_mask_を叩ける(self, client: TestClient) -> None:
+        # デフォルトの module-level `app` は API キー未設定（互換動作）
+        res = client.post("/mask", json={"data": "hello"})
+        assert res.status_code == 200
+
+    def test_api_key_設定時_正しいヘッダで_200(self) -> None:
+        from fuseji.server.app import create_app
+
+        secured_app = create_app(api_key="s3cret")
+        c = TestClient(secured_app)
+        res = c.post("/mask", headers={"X-API-Key": "s3cret"}, json={"data": "hello"})
+        assert res.status_code == 200
+
+    def test_api_key_設定時_ヘッダなしで_401(self) -> None:
+        from fuseji.server.app import create_app
+
+        secured_app = create_app(api_key="s3cret")
+        c = TestClient(secured_app)
+        res = c.post("/mask", json={"data": "hello"})
+        assert res.status_code == 401
+        assert res.json()["detail"] == "unauthorized"
+        # WWW-Authenticate ヘッダで認証スキームを明示
+        assert "ApiKey" in res.headers.get("www-authenticate", "")
+
+    def test_api_key_設定時_誤ったキーで_401(self) -> None:
+        from fuseji.server.app import create_app
+
+        secured_app = create_app(api_key="s3cret")
+        c = TestClient(secured_app)
+        res = c.post("/mask", headers={"X-API-Key": "wrong"}, json={"data": "hello"})
+        assert res.status_code == 401
+
+    def test_healthz_は_api_key_なしでも叩ける(self) -> None:
+        from fuseji.server.app import create_app
+
+        secured_app = create_app(api_key="s3cret")
+        c = TestClient(secured_app)
+        # /healthz は保護対象外（reverse-proxy / k8s liveness probe 想定）
+        res = c.get("/healthz")
+        assert res.status_code == 200
+
+    def test_openapi_スキーマは_api_key_なしでも叩ける(self) -> None:
+        from fuseji.server.app import create_app
+
+        secured_app = create_app(api_key="s3cret")
+        c = TestClient(secured_app)
+        res = c.get("/openapi.json")
+        assert res.status_code == 200
+
+    def test_detect_も_api_key_で保護される(self) -> None:
+        from fuseji.server.app import create_app
+
+        secured_app = create_app(api_key="s3cret")
+        c = TestClient(secured_app)
+        # ヘッダなしは 401
+        res1 = c.post("/detect", json={"text": "x"})
+        assert res1.status_code == 401
+        # 正しいヘッダで 200
+        res2 = c.post("/detect", headers={"X-API-Key": "s3cret"}, json={"text": "x"})
+        assert res2.status_code == 200
+
+    def test_環境変数で_api_key_を上書きできる(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("FUSEJI_API_KEY", "env-key")
+        from fuseji.server.app import _api_key_from_env
+
+        assert _api_key_from_env() == "env-key"
+
+    def test_空文字列の_API_KEY_は無効として扱う(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("FUSEJI_API_KEY", "   ")
+        from fuseji.server.app import _api_key_from_env
+
+        assert _api_key_from_env() is None
+
+
+class TestCors:
+    """CORS 制御 (#83)."""
+
+    def test_cors_origins_未設定なら_CORS_ヘッダなし(self, client: TestClient) -> None:
+        # デフォルト app は CORS 無効
+        res = client.options(
+            "/mask",
+            headers={
+                "Origin": "https://attacker.example.com",
+                "Access-Control-Request-Method": "POST",
+            },
+        )
+        # CORS ヘッダが返らない（同一オリジンのみ許可される実質状態）
+        assert "access-control-allow-origin" not in res.headers
+
+    def test_cors_origins_設定時_許可オリジンには_ACAO_ヘッダ(self) -> None:
+        from fuseji.server.app import create_app
+
+        cors_app = create_app(cors_origins=["https://app.example.com"])
+        c = TestClient(cors_app)
+        res = c.options(
+            "/mask",
+            headers={
+                "Origin": "https://app.example.com",
+                "Access-Control-Request-Method": "POST",
+                "Access-Control-Request-Headers": "Content-Type",
+            },
+        )
+        assert res.headers.get("access-control-allow-origin") == "https://app.example.com"
+
+    def test_cors_origins_未許可オリジンには_ACAO_なし(self) -> None:
+        from fuseji.server.app import create_app
+
+        cors_app = create_app(cors_origins=["https://app.example.com"])
+        c = TestClient(cors_app)
+        res = c.options(
+            "/mask",
+            headers={
+                "Origin": "https://attacker.example.com",
+                "Access-Control-Request-Method": "POST",
+            },
+        )
+        # 未許可オリジンへの ACAO は返さない
+        assert res.headers.get("access-control-allow-origin") != "https://attacker.example.com"
+
+    def test_環境変数で_CORS_origins_をカンマ区切りで上書き(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("FUSEJI_CORS_ORIGINS", "https://a.example.com, https://b.example.com")
+        from fuseji.server.app import _cors_origins_from_env
+
+        assert _cors_origins_from_env() == ["https://a.example.com", "https://b.example.com"]
