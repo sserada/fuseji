@@ -50,6 +50,8 @@ all = [
 Homepage = "https://github.com/sserada/fuseji"
 Repository = "https://github.com/sserada/fuseji"
 Issues = "https://github.com/sserada/fuseji/issues"
+Changelog = "https://github.com/sserada/fuseji/blob/main/CHANGELOG.md"
+Documentation = "https://github.com/sserada/fuseji/blob/main/docs/api.md"
 
 [build-system]
 requires = ["hatchling"]
