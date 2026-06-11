@@ -34,6 +34,7 @@ class TestPublicApi:
             "Vault",
             "VaultStrategy",
             "__version__",
+            "entity_types",
         }
         assert set(fuseji.__all__) == expected
 
