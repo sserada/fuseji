@@ -1,6 +1,6 @@
 [project]
 name = "fuseji"
-version = "0.1.0"
+version = "0.1.1.dev0"
 description = "日本語特化の PII 検出・マスキングミドルウェア（LLM オブザーバビリティ向け）"
 readme = "README.md"
 requires-python = ">=3.10"
