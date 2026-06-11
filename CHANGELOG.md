@@ -20,6 +20,10 @@
 
 ### Changed
 
+- ベンチマークを 3 領域に拡充（#98）:
+  - `bench_resolve_overlaps.py` を新設し、entity 数 10/100/1000 で `_resolve_overlaps` の O(n²) スケール曲線を計測（#95 sweep-line 化の前後比較に利用）
+  - `bench_mask_json.py` を新設し、flat dict (100/1000 leaf) と入れ子 (3/10 段) の `mask_json` レイテンシを計測
+  - `bench_strategies.py` を新設し、Placeholder / Redact / Hash / VaultStrategy を 100 PII で横並び比較（#96 #97 の前後計測に利用）
 - ベンチマークの環境マーカーと CI 信頼性を改善（#92）:
   - `tests/bench/conftest.py` を追加し、`pytest_benchmark_update_machine_info` フックで `fuseji_env_key`（例: `darwin-arm64` / `linux-x86_64`）を machine_info に埋め込む。baseline ファイル名に環境キーを含める運用を `tests/bench/README.md` で案内
   - `tests/test_latency_regression.py` の閾値テストをデフォルトスキップに変更。`CI_PERF=1` を設定したジョブまたはローカル検証でのみ実行（通常 CI のノイズで偽陽性が起きやすかったため）
