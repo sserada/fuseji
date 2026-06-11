@@ -15,6 +15,11 @@
   - デフォルト `keep_mapping` を **False** に設定。`Hash().mask(...)` の戻り値 `mapping` は空 dict
   - 逆引きが必要な場合は `Hash(keep_mapping=True)` を明示的に指定（v0.1 互換の挙動）
   - 移行方法: 既存コードで `mapping` を使っていた場合は `Hash(keep_mapping=True)` に書き換える。`length` を 8 固定にしていた場合は `Hash(length=8, keep_mapping=True)` でハッシュ値も維持できる
+- `Masker.mask_json` の depth 境界仕様を明確化（#99）:
+  - 比較を `depth > max_json_depth` → `depth >= max_json_depth` に変更
+  - 新仕様: `max_json_depth=N` のとき、ルート(depth=0) を起点に 0..N-1 の **計 N 段** まで再帰を許容、depth N 以降で fail-closed
+  - 旧仕様（v0.1）は off-by-one で実際は N+1 段まで処理されていた
+  - 移行方法: `max_json_depth` を 1 段増やせば旧挙動を維持できる（例: `Masker(max_json_depth=100)` → `Masker(max_json_depth=101)`）
 - `InMemoryVault.DEFAULT_EXCLUDED_TYPES` に `CREDIT_CARD` を追加（#84）:
   - PCI DSS Requirement 3.4 / 3.5 で「保存禁止または強い保護下」が求められる PAN を、番号法対応の `MY_NUMBER` と同等に Vault 復元不可とする
   - 結果: `Vault(masker=...)` 経路で CREDIT_CARD は `<CREDIT_CARD>`（番号なし）で固定マスクされ、`mapping` に残らない
