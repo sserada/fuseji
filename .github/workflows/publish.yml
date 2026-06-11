@@ -1,0 +1,96 @@
+name: Publish to PyPI
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: '公開先 (testpypi で検証 → pypi で本番公開)'
+        required: true
+        type: choice
+        options:
+          - testpypi
+          - pypi
+  push:
+    tags:
+      # vX.Y.Z 形式のタグ push 時に PyPI 本番へ自動公開
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+rc[0-9]+'
+
+jobs:
+  build:
+    name: Build sdist + wheel
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # version 推定や changelog 生成のため履歴フル取得
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - name: Set up Python 3.13
+        run: uv python install 3.13
+      - name: Install dependencies
+        run: uv sync
+      - name: ruff check
+        run: uv run ruff check src/ tests/
+      - name: ruff format check
+        run: uv run ruff format --check src/ tests/
+      - name: mypy
+        run: uv run mypy src/
+      - name: pytest
+        run: uv run pytest -q
+      - name: Build distributions
+        run: uv build
+      - name: Verify built artifacts
+        run: |
+          ls -la dist/
+          uv run python -m zipfile -l dist/*.whl | head -20
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          retention-days: 7
+
+  publish-testpypi:
+    name: Publish to TestPyPI
+    needs: build
+    if: github.event_name == 'workflow_dispatch' && inputs.target == 'testpypi'
+    runs-on: ubuntu-latest
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/fuseji
+    permissions:
+      id-token: write  # OIDC token for trusted publishing
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - name: Publish to TestPyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+  publish-pypi:
+    name: Publish to PyPI
+    needs: build
+    if: >-
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && inputs.target == 'pypi')
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/fuseji
+    permissions:
+      id-token: write  # OIDC token for trusted publishing
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
