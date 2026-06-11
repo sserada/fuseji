@@ -183,15 +183,53 @@ class TestMaskJson:
         assert result == data
         assert isinstance(result, frozenset)
 
-    def test_dict_キーは素通しされる現状仕様(self) -> None:
-        # docstring 「辞書のキーは PII を含まない前提」を反映した現状動作の確認。
-        # キーに PII を含むケースは #85 でオプトイン対応予定。
-        # この回帰テストは #85 完了後に「マスクされる」テストに置き換える。
-        m = Masker()
+    def test_dict_キーは_mask_dict_keys_False_では素通し(self) -> None:
+        # デフォルト挙動（v0.1 互換）: キーは PII を含まない前提で素通し。
+        # 動的キーに PII が入る用途では mask_dict_keys=True を明示する（#85）。
+        m = Masker()  # mask_dict_keys=False (デフォルト)
         result = m.mask_json({"taro@example.com": "value"})
-        assert "taro@example.com" in result  # キーが残る現状仕様
-        # 値もシンプルな文字列なのでマスクされない
-        assert result == {"taro@example.com": "value"}
+        assert "taro@example.com" in result
+
+    def test_dict_キーは_mask_dict_keys_True_でマスクされる(self) -> None:
+        # mask_dict_keys=True: 動的キーに PII が混入する場合のセキュアモード
+        m = Masker(mask_dict_keys=True)
+        result = m.mask_json({"taro@example.com": "value"})
+        # キーが <EMAIL_1> 形式にマスクされ、元の PII は残らない
+        assert "taro@example.com" not in str(result)
+        # 唯一のキーがマスクされていることを確認
+        assert len(result) == 1
+        key = next(iter(result.keys()))
+        assert "<EMAIL_" in key
+
+    def test_dict_キーマスクで衝突したらサフィックスで一意化(self) -> None:
+        # 2 つの異なる surface でも同じハッシュ・同じ placeholder にはならないが、
+        # mask の戻り値が同じになるケース（例: 同じ PII 文字列が複数のキーに）に
+        # 対する衝突回避を確認
+        m = Masker(mask_dict_keys=True)
+        result = m.mask_json(
+            {
+                "taro@example.com": "v1",
+                "taro@example.com extra": "v2",  # 部分的に同じ PII を含む別キー
+            }
+        )
+        # キーが 2 つ残ること（情報が失われない）
+        assert len(result) == 2
+
+    def test_mask_dict_keys_True_でも非_str_キーは素通し(self) -> None:
+        # int / tuple など str 以外のキーはマスクできないので素通し
+        m = Masker(mask_dict_keys=True)
+        result = m.mask_json({42: "taro@example.com", (1, 2): "v"})
+        assert 42 in result
+        assert (1, 2) in result
+        # 値の方はマスクされる
+        assert "<EMAIL_1>" in result[42]
+
+    def test_mask_dict_keys_True_でも値のマスクは継続(self) -> None:
+        m = Masker(mask_dict_keys=True)
+        result = m.mask_json({"普通のキー": "メール: a@b.com"})
+        # キーは PII なしなのでマスク結果は同じ文字列
+        assert "普通のキー" in result
+        assert "<EMAIL_1>" in result["普通のキー"]
 
     def test_int_float_bool_None_は素通し(self) -> None:
         # スカラ型は対象外で素通し

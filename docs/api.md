@@ -43,6 +43,8 @@ class Masker:
 | `strategy` | `Placeholder()` | マスキング戦略 |
 | `threshold` | `0.4` | このスコア未満は除外（recall 寄り） |
 | `vault` | `None` | 仮名化バウルト。指定時は Placeholder 形式で必ずマスクし、戦略指定は無視 |
+| `max_json_depth` | `100` | `mask_json` の再帰深度上限。N 段までネスト許容、N 段目で fail-closed |
+| `mask_dict_keys` | `False` | `True` で `mask_json` が dict のキー（str のみ）も値と同じ戦略でマスク |
 
 ### メソッド
 
