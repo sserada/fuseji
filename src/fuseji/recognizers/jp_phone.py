@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable
+from collections.abc import Iterator
 
 from ..entity_types import JP_PHONE_NUMBER
 from ..types import Entity
@@ -45,7 +45,7 @@ class JpPhoneRecognizer:
     entity_type = JP_PHONE_NUMBER
     name = "jp_phone"
 
-    def analyze(self, text: str, *, normalized: str | None = None) -> Iterable[Entity]:
+    def analyze(self, text: str, *, normalized: str | None = None) -> Iterator[Entity]:
         return regex_analyze(
             text,
             entity_type=self.entity_type,

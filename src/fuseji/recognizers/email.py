@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable
+from collections.abc import Iterator
 
 from ..entity_types import EMAIL
 from ..types import Entity
@@ -21,7 +21,7 @@ class EmailRecognizer:
     entity_type = EMAIL
     name = "email"
 
-    def analyze(self, text: str, *, normalized: str | None = None) -> Iterable[Entity]:
+    def analyze(self, text: str, *, normalized: str | None = None) -> Iterator[Entity]:
         # EMAIL は数字・ハイフン正規化を必要としないため `normalized` は無視。
         # シグネチャは v0.2 の Protocol 要件として明示的に受け取る。
         del normalized

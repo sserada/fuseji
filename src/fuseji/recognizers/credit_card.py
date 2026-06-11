@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable
+from collections.abc import Iterator
 
 from ..entity_types import CREDIT_CARD
 from ..types import Entity
@@ -46,7 +46,7 @@ class CreditCardRecognizer:
     entity_type = CREDIT_CARD
     name = "credit_card"
 
-    def analyze(self, text: str, *, normalized: str | None = None) -> Iterable[Entity]:
+    def analyze(self, text: str, *, normalized: str | None = None) -> Iterator[Entity]:
         return regex_analyze(
             text,
             entity_type=self.entity_type,

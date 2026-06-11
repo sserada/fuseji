@@ -4,8 +4,14 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from types import MappingProxyType
 
 from .exceptions import InvalidEntityError
+
+# 空 mapping のシングルトン。`MaskResult.mapping` のデフォルトに使い、
+# `field(default_factory=dict)` で毎回 mutable dict を生成するコストを排除する。
+# 型は `Mapping[str, str]`（読み取り専用契約）なので、共有しても安全。
+_EMPTY_MAPPING: Mapping[str, str] = MappingProxyType({})
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,4 +57,4 @@ class MaskResult:
 
     text: str
     entities: tuple[Entity, ...]
-    mapping: Mapping[str, str] = field(default_factory=dict)
+    mapping: Mapping[str, str] = field(default=_EMPTY_MAPPING)

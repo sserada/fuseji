@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import os
-from typing import Any
+from collections.abc import Callable
+from typing import Any, TypeVar
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -50,15 +51,27 @@ class BodySizeLimitMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
-def _max_body_bytes_from_env() -> int:
-    raw = os.environ.get(_ENV_MAX_BODY)
+_T = TypeVar("_T", int, float)
+
+
+def _positive_from_env(name: str, default: _T, cast: Callable[[str], _T]) -> _T:
+    """環境変数から正の数値を読み取り、未設定・不正値・非正値はデフォルトを返す。
+
+    本サーバーの上限系設定（body size / timeout）はいずれも正の値のみが意味を
+    持つため、cast 失敗および <= 0 を同じ「無効」として扱う。
+    """
+    raw = os.environ.get(name)
     if raw is None:
-        return DEFAULT_MAX_BODY_BYTES
+        return default
     try:
-        value = int(raw)
+        value = cast(raw)
     except ValueError:
-        return DEFAULT_MAX_BODY_BYTES
-    return value if value > 0 else DEFAULT_MAX_BODY_BYTES
+        return default
+    return value if value > 0 else default
+
+
+def _max_body_bytes_from_env() -> int:
+    return _positive_from_env(_ENV_MAX_BODY, DEFAULT_MAX_BODY_BYTES, int)
 
 
 class RequestTimeoutMiddleware(BaseHTTPMiddleware):
@@ -86,14 +99,7 @@ class RequestTimeoutMiddleware(BaseHTTPMiddleware):
 
 
 def _timeout_seconds_from_env() -> float:
-    raw = os.environ.get(_ENV_TIMEOUT)
-    if raw is None:
-        return DEFAULT_TIMEOUT_SECONDS
-    try:
-        value = float(raw)
-    except ValueError:
-        return DEFAULT_TIMEOUT_SECONDS
-    return value if value > 0 else DEFAULT_TIMEOUT_SECONDS
+    return _positive_from_env(_ENV_TIMEOUT, DEFAULT_TIMEOUT_SECONDS, float)
 
 
 class MaskRequest(BaseModel):

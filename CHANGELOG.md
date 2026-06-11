@@ -5,6 +5,15 @@
 
 ## [Unreleased]
 
+### Changed
+
+- 軽微なコード品質改善をまとめて反映（#94）:
+  - `MaskResult.mapping` のデフォルト値を `MappingProxyType({})` のシングルトンに変更。`field(default_factory=dict)` で毎回 mutable dict を生成するコストを排除
+  - `server/app.py` の env 変数パース処理を共通ヘルパ `_positive_from_env` に集約（`_max_body_bytes_from_env` / `_timeout_seconds_from_env` の重複を吸収）
+  - `Recognizer.analyze` / `NerBackend.analyze` / GiNZA 実装の戻り型を `Iterable[Entity]` → `Iterator[Entity]` に統一。実体は generator なので「1 回しか走査できない」契約を型で表現
+  - GiNZA バックエンドのラベルリテラル `"Person"` を `_GINZA_PERSON_LABEL` 定数に集約
+  - `fuseji.recognizers.__all__` から内部ヘルパ (`regex_analyze`, `normalize_digits`, `normalize_hyphens`) を除外。必要なら `from fuseji.recognizers.base import ...` で個別 import
+
 ### Breaking Changes
 
 - `Recognizer` プロトコルの `analyze` シグネチャが `analyze(self, text: str, *, normalized: str | None = None) -> Iterable[Entity]` に変更。`normalized` kwarg を受け取らないカスタム認識器は v0.2 以降で `TypeError` になる（#93）

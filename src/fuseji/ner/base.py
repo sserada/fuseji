@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterator
 from typing import Protocol
 
 from ..types import Entity
@@ -16,4 +16,4 @@ class NerBackend(Protocol):
     モデル依存のため optional extra として分離する。
     """
 
-    def analyze(self, text: str) -> Iterable[Entity]: ...
+    def analyze(self, text: str) -> Iterator[Entity]: ...

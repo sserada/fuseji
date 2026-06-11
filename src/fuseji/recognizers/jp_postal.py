@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable
+from collections.abc import Iterator
 
 from ..entity_types import JP_POSTAL_CODE
 from ..types import Entity
@@ -38,7 +38,7 @@ class JpPostalRecognizer:
     entity_type = JP_POSTAL_CODE
     name = "jp_postal"
 
-    def analyze(self, text: str, *, normalized: str | None = None) -> Iterable[Entity]:
+    def analyze(self, text: str, *, normalized: str | None = None) -> Iterator[Entity]:
         if normalized is None:
             normalized = normalize(text)
         emitted_spans: list[tuple[int, int]] = []
