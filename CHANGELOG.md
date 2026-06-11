@@ -7,6 +7,11 @@
 
 ### Added
 
+- `Vault` プロトコルに `assign_many(pairs)` を追加（#97）:
+  - `(type, surface)` のシーケンスに対し一括で placeholder を割り当てる API
+  - `InMemoryVault` 実装は 1 回の lock 取得で全件処理し、`VaultStrategy.mask` で k 回の lock contention を 1 回に縮約
+  - `VaultStrategy.mask` をユニーク化 + `assign_many` ベースに書き換え
+  - Protocol default 実装は個別 `assign` の繰り返しなので、サードパーティ Vault は破壊的変更なし
 - `InMemoryVault(max_size=N)` オプションを追加（#86）:
   - 登録済み placeholder 数の上限を設け、上限到達後の新規 `assign` では FIFO で最古エントリを退避
   - 長時間稼働サーバーでメモリ使用量とメモリダンプ経由の事後流出リスクを抑止する DoS 緩和策

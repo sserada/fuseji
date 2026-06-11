@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 import threading
 from collections import OrderedDict
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from typing import Protocol
 
 from . import entity_types
@@ -29,6 +29,24 @@ class Vault(Protocol):
         除外 type の場合は None を返す（呼び出し側で別途マスクする必要がある）。
         """
         ...
+
+    def assign_many(self, pairs: Sequence[tuple[str, str]]) -> list[str | None]:
+        """複数の (type, surface) ペアに対し一括で placeholder を割り当てる。
+
+        `assign` を要素数だけ呼ぶのと意味的に等価だが、実装は 1 回の lock 取得で
+        全件を処理できる（`VaultStrategy.mask` で k 回の lock contention を 1 回に
+        削減するための最適化）。
+
+        デフォルト実装は individual `assign` を順に呼ぶ。並列性能を求める実装は
+        オーバーライドする（`InMemoryVault.assign_many` は単一 lock 内で処理）。
+
+        Args:
+            pairs: `(entity_type, surface)` のシーケンス。
+
+        Returns:
+            `pairs` と同じ長さの placeholder（または None）のリスト。
+        """
+        return [self.assign(t, s) for t, s in pairs]
 
     def get(self, placeholder: str) -> str | None:
         """placeholder から元 surface を取得。未登録なら None。"""
@@ -130,20 +148,57 @@ class InMemoryVault:
             return cached
         # 新規割当は競合を避けるためロック内で再チェック → 採番。
         with self._lock:
-            cached = self._surface_to_placeholder.get(key)
+            return self._assign_locked(entity_type, surface)
+
+    def assign_many(self, pairs: Sequence[tuple[str, str]]) -> list[str | None]:
+        """複数 (type, surface) ペアを 1 回の lock 取得で一括採番する (#97)。
+
+        VaultStrategy が新規 PII 群を投入する経路で k 回の lock contention を
+        1 回に削減できる。並行リクエスト下での `assign` 直列化を抑止する。
+        """
+        if not pairs:
+            return []
+        results: list[str | None] = [None] * len(pairs)
+        # excluded type は lock 不要で None を返せる。残りを lock 内で処理。
+        pending: list[tuple[int, str, str]] = []
+        for i, (etype, surface) in enumerate(pairs):
+            if etype in self._excluded:
+                results[i] = None
+                continue
+            # fast-path: 既存 placeholder は lock 取らずに返す
+            cached = self._surface_to_placeholder.get((etype, surface))
             if cached is not None:
-                return cached
-            self._counters[entity_type] = self._counters.get(entity_type, 0) + 1
-            placeholder = f"<{entity_type}_{self._counters[entity_type]}>"
-            self._surface_to_placeholder[key] = placeholder
-            self._placeholder_to_surface[placeholder] = surface
-            # max_size 超過時は FIFO で最古エントリを退避（counters は維持して
-            # 新規 placeholder 番号の単調増加を保つ — 退避済み番号は再利用しない）
-            if self._max_size is not None:
-                while len(self._placeholder_to_surface) > self._max_size:
-                    self._surface_to_placeholder.popitem(last=False)
-                    self._placeholder_to_surface.popitem(last=False)
-            return placeholder
+                results[i] = cached
+            else:
+                pending.append((i, etype, surface))
+        if pending:
+            with self._lock:
+                for i, etype, surface in pending:
+                    results[i] = self._assign_locked(etype, surface)
+        return results
+
+    def _assign_locked(self, entity_type: str, surface: str) -> str:
+        """lock 取得済みの状態で 1 件採番する内部実装。
+
+        Caller は `self._lock` を保持していること。`entity_type` が
+        `_excluded` でないこと、cache miss が確認済みであることが前提だが、
+        並行性のため再 check してから採番する（double-checked locking）。
+        """
+        key = (entity_type, surface)
+        cached = self._surface_to_placeholder.get(key)
+        if cached is not None:
+            return cached
+        self._counters[entity_type] = self._counters.get(entity_type, 0) + 1
+        placeholder = f"<{entity_type}_{self._counters[entity_type]}>"
+        self._surface_to_placeholder[key] = placeholder
+        self._placeholder_to_surface[placeholder] = surface
+        # max_size 超過時は FIFO で最古エントリを退避（counters は維持して
+        # 新規 placeholder 番号の単調増加を保つ — 退避済み番号は再利用しない）
+        if self._max_size is not None:
+            while len(self._placeholder_to_surface) > self._max_size:
+                self._surface_to_placeholder.popitem(last=False)
+                self._placeholder_to_surface.popitem(last=False)
+        return placeholder
 
     def get(self, placeholder: str) -> str | None:
         return self._placeholder_to_surface.get(placeholder)

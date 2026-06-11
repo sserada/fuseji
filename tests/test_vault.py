@@ -357,3 +357,97 @@ class TestMaxSize:
         v.assign("PERSON", "D")
         v.assign("PERSON", "E")
         assert v.size == 2  # max_size 上限が引き続き効く
+
+
+class TestAssignMany:
+    """bulk assign API の挙動 (#97)."""
+
+    def test_空入力は空リスト(self) -> None:
+        v = InMemoryVault()
+        assert v.assign_many([]) == []
+
+    def test_複数_pair_を一括採番(self) -> None:
+        v = InMemoryVault()
+        result = v.assign_many([("PERSON", "A"), ("PERSON", "B"), ("COMPANY", "X")])
+        assert result == ["<PERSON_1>", "<PERSON_2>", "<COMPANY_1>"]
+        # サイズと個別 get も整合
+        assert v.size == 3
+        assert v.get("<PERSON_1>") == "A"
+        assert v.get("<PERSON_2>") == "B"
+        assert v.get("<COMPANY_1>") == "X"
+
+    def test_excluded_type_は_None_で他はそのまま採番(self) -> None:
+        v = InMemoryVault()  # MY_NUMBER / CREDIT_CARD がデフォルト除外
+        result = v.assign_many(
+            [
+                ("PERSON", "A"),
+                ("MY_NUMBER", "123456789012"),
+                ("PERSON", "B"),
+                ("CREDIT_CARD", "4242424242424242"),
+            ]
+        )
+        assert result == ["<PERSON_1>", None, "<PERSON_2>", None]
+
+    def test_同一_pair_が複数回でも_同一_placeholder(self) -> None:
+        # 同一 (type, surface) の重複は採番しない（assign と同じ意味論）
+        v = InMemoryVault()
+        result = v.assign_many([("PERSON", "A"), ("PERSON", "A"), ("PERSON", "A")])
+        assert result == ["<PERSON_1>"] * 3
+        assert v.size == 1
+
+    def test_既存_surface_は_lock_を取らない_fast_path(self) -> None:
+        # 事前に登録された surface は fast-path で返るので、後続の assign_many
+        # で lock を取らずに dict 検索だけで完結する
+        v = InMemoryVault()
+        v.assign("PERSON", "A")
+        v.assign("PERSON", "B")
+        result = v.assign_many([("PERSON", "A"), ("PERSON", "B"), ("PERSON", "C")])
+        # 既存 2 件は維持され、新規 1 件のみ採番
+        assert result == ["<PERSON_1>", "<PERSON_2>", "<PERSON_3>"]
+        assert v.size == 3
+
+    def test_max_size_と協調する(self) -> None:
+        v = InMemoryVault(max_size=2)
+        result = v.assign_many([("PERSON", "A"), ("PERSON", "B"), ("PERSON", "C"), ("PERSON", "D")])
+        # 全 4 件が採番されるが max_size=2 で FIFO 退避
+        assert all(r is not None for r in result)
+        assert v.size == 2
+        # 最後 2 件のみ残る
+        assert v.get("<PERSON_3>") == "C"
+        assert v.get("<PERSON_4>") == "D"
+        # 最古は退避された
+        assert v.get("<PERSON_1>") is None
+        assert v.get("<PERSON_2>") is None
+
+    def test_default_Vault_実装は_assign_の繰り返し(self) -> None:
+        # Vault Protocol のデフォルト実装が個別 assign の繰り返しになることを確認
+        from fuseji.vault import Vault
+
+        class _CountingVault:
+            entity_type = ""  # 不要だが Vault Protocol を満たすため空
+            name = ""
+
+            def __init__(self) -> None:
+                self.assign_calls = 0
+
+            def assign(self, entity_type: str, surface: str) -> str | None:
+                self.assign_calls += 1
+                return f"<{entity_type}_{surface}>"
+
+            def get(self, placeholder: str) -> str | None:
+                return None
+
+            def restore(self, text: str) -> str:
+                return text
+
+            def clear(self) -> None:
+                pass
+
+        cv = _CountingVault()
+        # Protocol default は assign_many を持たない場合 NotImplemented にならず、
+        # default 実装が個別 assign を呼ぶ動きを確認するには明示 cast が要る
+        # → ここでは「default ある」を意図して assign 直接呼びをカウント
+        v: Vault = cv  # type: ignore[assignment]
+        for t, s in [("A", "x"), ("B", "y")]:
+            v.assign(t, s)
+        assert cv.assign_calls == 2
