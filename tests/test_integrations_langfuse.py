@@ -87,3 +87,51 @@ class TestMakeMaskFn:
         result: Any = fn("機密情報: secret@example.com")
         assert "secret" not in str(result)
         assert "example.com" not in str(result)
+
+    def test_デフォルトログには例外型名のみで_tracebackなし(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        # トレースバック内の PII 漏洩を避けるため、デフォルトでは
+        # 例外型名のみログし、traceback はログしない。
+        class _BrokenRecognizer:
+            entity_type = "BROKEN"
+
+            def analyze(self, text: str) -> Iterable[Entity]:
+                # メッセージに PII を含むケースを想定
+                raise RuntimeError("token=secret@example.com")
+
+        m = Masker(recognizers=[_BrokenRecognizer()])
+        fn = make_mask_fn(m)
+
+        with caplog.at_level(logging.WARNING):
+            fn("input")
+
+        # ログメッセージに RuntimeError 型名は含まれるが PII を含むメッセージ本体は含まれない
+        assert any("RuntimeError" in r.message for r in caplog.records)
+        all_text = " ".join(r.message for r in caplog.records)
+        assert "secret@example.com" not in all_text
+        # exc_info を渡していないので exc_text も None
+        for r in caplog.records:
+            assert r.exc_text is None
+
+    def test_環境変数_LOG_TRACEBACK_1_でフルトレースバック有効化(
+        self,
+        caplog: pytest.LogCaptureFixture,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setenv("FUSEJI_LANGFUSE_LOG_TRACEBACK", "1")
+
+        class _BrokenRecognizer:
+            entity_type = "BROKEN"
+
+            def analyze(self, text: str) -> Iterable[Entity]:
+                raise RuntimeError("with traceback")
+
+        m = Masker(recognizers=[_BrokenRecognizer()])
+        fn = make_mask_fn(m)
+
+        with caplog.at_level(logging.WARNING):
+            fn("input")
+
+        # exc_info 付きでログされる
+        assert any(r.exc_text and "RuntimeError" in r.exc_text for r in caplog.records)
