@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 
+from .. import __version__
 from ..engine import Masker
 
 # デフォルトのリクエストボディサイズ上限（1 MB）。環境変数で上書き可能。
@@ -175,7 +176,7 @@ def create_app(
     new_app = FastAPI(
         title="fuseji",
         description="日本語特化の PII 検出・マスキングミドルウェア",
-        version="0.1.0",
+        version=__version__,
     )
     # ミドルウェアは登録順の逆順で外側に被さる。timeout を最外周（最後に登録）に
     # 置くと、body-size limit 内側の処理時間も含めて計測される。

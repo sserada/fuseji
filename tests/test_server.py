@@ -97,6 +97,13 @@ class TestOpenAPI:
         assert "/detect" in paths
         assert "/healthz" in paths
 
+    def test_openapi_version_は___version___と一致する(self, client: TestClient) -> None:
+        # ハードコード文字列ではなく fuseji.__version__ が反映されることを確認
+        from fuseji import __version__
+
+        res = client.get("/openapi.json")
+        assert res.json()["info"]["version"] == __version__
+
 
 class TestBodySizeLimit:
     def test_デフォルト_1MB_未満は受け付ける(self, client: TestClient) -> None:
