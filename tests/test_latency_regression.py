@@ -8,15 +8,30 @@
 GitHub Actions ubuntu-latest（Apple M1 比でおおむね 2-3x 遅い）
 を念頭に **3x 余裕** を持たせた上限値で assertion する。
 
+CI 環境のノイズで誤検知が起きやすいため、デフォルトではスキップされ、
+環境変数 ``CI_PERF=1`` を設定したジョブでのみ実行される (#92)。
+ローカルや専用 perf-CI ジョブで設定すること:
+
+    CI_PERF=1 uv run pytest tests/test_latency_regression.py
+
 詳細な計測・スケール曲線・他ツール比較は tests/bench/ を参照。
 """
 
 from __future__ import annotations
 
 import gc
+import os
 import time
 
+import pytest
+
 from fuseji import InMemoryVault, Masker
+
+# CI_PERF=1 を設定したジョブでのみ実行する。デフォルトはスキップ。
+# 通常 CI の test ジョブで thermal throttling 等で偽陽性が起きやすいため。
+_RUN_PERF_TESTS = os.getenv("CI_PERF") == "1"
+_SKIP_REASON = "perf テストは CI_PERF=1 のジョブでのみ実行（CI ノイズで誤検知防止）"
+pytestmark = pytest.mark.skipif(not _RUN_PERF_TESTS, reason=_SKIP_REASON)
 
 
 def _measure(fn, iterations: int = 20, warmup: int = 3) -> float:
