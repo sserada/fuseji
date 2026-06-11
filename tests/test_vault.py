@@ -38,19 +38,28 @@ class TestAssign:
 
 
 class TestExcludedTypes:
-    def test_デフォルトは_MY_NUMBER_を除外(self) -> None:
+    def test_デフォルトは_MY_NUMBER_と_CREDIT_CARD_を除外(self) -> None:
+        # v0.2: 番号法対応 (MY_NUMBER) + PCI DSS 整合 (CREDIT_CARD) で両方除外
         v = InMemoryVault()
-        assert v.excluded_types == frozenset({"MY_NUMBER"})
+        assert v.excluded_types == frozenset({"MY_NUMBER", "CREDIT_CARD"})
 
     def test_MY_NUMBER_は_None_を返す(self) -> None:
         v = InMemoryVault()
         assert v.assign("MY_NUMBER", "123456789012") is None
 
+    def test_CREDIT_CARD_は_None_を返す(self) -> None:
+        # PCI DSS 整合: PAN を mapping に残さない（#84）
+        v = InMemoryVault()
+        assert v.assign("CREDIT_CARD", "4242424242424242") is None
+
     def test_除外_type_は対応表に残らない(self) -> None:
         v = InMemoryVault()
         v.assign("MY_NUMBER", "123456789012")
+        v.assign("CREDIT_CARD", "4242424242424242")
         assert v.restore("<MY_NUMBER_1>") == "<MY_NUMBER_1>"
+        assert v.restore("<CREDIT_CARD_1>") == "<CREDIT_CARD_1>"
         assert v.get("<MY_NUMBER_1>") is None
+        assert v.get("<CREDIT_CARD_1>") is None
 
     def test_カスタム除外集合(self) -> None:
         v = InMemoryVault(excluded_types=["EMAIL", "CREDIT_CARD"])

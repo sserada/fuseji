@@ -15,6 +15,10 @@
   - デフォルト `keep_mapping` を **False** に設定。`Hash().mask(...)` の戻り値 `mapping` は空 dict
   - 逆引きが必要な場合は `Hash(keep_mapping=True)` を明示的に指定（v0.1 互換の挙動）
   - 移行方法: 既存コードで `mapping` を使っていた場合は `Hash(keep_mapping=True)` に書き換える。`length` を 8 固定にしていた場合は `Hash(length=8, keep_mapping=True)` でハッシュ値も維持できる
+- `InMemoryVault.DEFAULT_EXCLUDED_TYPES` に `CREDIT_CARD` を追加（#84）:
+  - PCI DSS Requirement 3.4 / 3.5 で「保存禁止または強い保護下」が求められる PAN を、番号法対応の `MY_NUMBER` と同等に Vault 復元不可とする
+  - 結果: `Vault(masker=...)` 経路で CREDIT_CARD は `<CREDIT_CARD>`（番号なし）で固定マスクされ、`mapping` に残らない
+  - 移行方法: 旧挙動を維持する場合は `InMemoryVault(excluded_types=["MY_NUMBER"])` を明示指定して CREDIT_CARD を除外集合から外す
 
 ### Added
 
