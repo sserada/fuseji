@@ -147,3 +147,74 @@ class TestMaskJson:
         m = Masker(max_json_depth=1)
         result = m.mask_json("メール: a@b.com")
         assert "<EMAIL_1>" in result
+
+    def test_自己参照_dict_は_too_deep_で停止する(self) -> None:
+        # 循環参照は max_json_depth に達した時点で fail-closed
+        # 無限再帰せず必ず有限時間で完了することを保証
+        m = Masker(max_json_depth=5)
+        d: dict[str, object] = {}
+        d["self"] = d
+        result = m.mask_json(d)
+        # depth 5 で too-deep に達し、内側が固定文字列に置換される
+        assert "[fuseji: too deep]" in str(result)
+
+    def test_bytes_は素通しされる現状仕様(self) -> None:
+        # 非対象型として bytes はそのまま返る（マスクされない）。
+        # NOTE: これは v0.2 時点の明示的な仕様。bytes 経由で PII が漏れる経路は
+        # 別 Issue で対処予定（呼び出し側が bytes を decode してから mask_json に
+        # 渡す責任を持つ）。
+        m = Masker()
+        result = m.mask_json(b"taro@example.com")
+        assert result == b"taro@example.com"
+
+    def test_set_は素通しされる現状仕様(self) -> None:
+        # set / frozenset も JSON 互換型ではないので素通し（マスクされない）。
+        # 呼び出し側が list 化してから mask_json に渡す責任を持つ。
+        m = Masker()
+        data = {"a@b.com", "c@d.com"}
+        result = m.mask_json(data)
+        assert result == data
+        assert isinstance(result, set)
+
+    def test_frozenset_も素通し(self) -> None:
+        m = Masker()
+        data = frozenset({"a@b.com"})
+        result = m.mask_json(data)
+        assert result == data
+        assert isinstance(result, frozenset)
+
+    def test_dict_キーは素通しされる現状仕様(self) -> None:
+        # docstring 「辞書のキーは PII を含まない前提」を反映した現状動作の確認。
+        # キーに PII を含むケースは #85 でオプトイン対応予定。
+        # この回帰テストは #85 完了後に「マスクされる」テストに置き換える。
+        m = Masker()
+        result = m.mask_json({"taro@example.com": "value"})
+        assert "taro@example.com" in result  # キーが残る現状仕様
+        # 値もシンプルな文字列なのでマスクされない
+        assert result == {"taro@example.com": "value"}
+
+    def test_int_float_bool_None_は素通し(self) -> None:
+        # スカラ型は対象外で素通し
+        m = Masker()
+        for v in [42, 3.14, True, False, None]:
+            assert m.mask_json(v) == v
+
+    def test_dict_の値がさまざまな型でも安全(self) -> None:
+        # 混在型 dict
+        m = Masker()
+        data = {
+            "email": "taro@example.com",
+            "age": 30,
+            "active": True,
+            "tags": ["urgent", "a@b.com"],
+            "meta": None,
+        }
+        result = m.mask_json(data)
+        # email 値はマスクされる
+        assert "<EMAIL_1>" in result["email"]
+        # スカラはそのまま
+        assert result["age"] == 30
+        assert result["active"] is True
+        assert result["meta"] is None
+        # list 内の email はマスク
+        assert any("<EMAIL_" in s for s in result["tags"])
