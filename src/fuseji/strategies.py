@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import hashlib
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -142,6 +143,21 @@ class VaultStrategy:
         return _replace_spans(text, replacements), mapping
 
 
+@functools.lru_cache(maxsize=8192)
+def _sha256_hex(surface: str) -> str:
+    """SHA256 を 16 進文字列で返す。`Hash(cache=True)` 経路で共有される (#96).
+
+    `lru_cache` のキーは `surface` のみで、length は呼び出し側でスライスするため
+    複数の `Hash(length=N)` インスタンスでも同じ digest を再利用できる。
+
+    **セキュリティ注意**: cache は (surface, digest) を保持するため、
+    プロセスメモリに PII surface が最大 8192 件残る。fuseji の「detect, never
+    retain」設計原則と背反するトレードオフがあるため、本キャッシュは
+    `Hash(cache=True)` を **明示的に有効化** したときのみ使われる（デフォルト無効）。
+    """
+    return hashlib.sha256(surface.encode("utf-8")).hexdigest()
+
+
 @dataclass(frozen=True, slots=True)
 class Hash:
     """SHA256 ハッシュの先頭 N 文字（hex）で置換する戦略。
@@ -155,6 +171,10 @@ class Hash:
       明示的に指定したときのみ `{hash: 元 surface}` を返す。
       v0.1 のデフォルト挙動（mapping に逆引きテーブル）は PII 漏洩経路
       になりうるため v0.2 で破壊的変更（#82）。
+    - `cache=True` を指定するとプロセス内 LRU (max 8192 件) で SHA256 を
+      再利用する。同じ surface が反復するログで CPU 削減になる一方、
+      cache キーとして PII surface がメモリに保持される。
+      「detect, never retain」原則との背反を理解した上で opt-in する (#96)。
 
     Example:
         >>> from fuseji import Masker, Hash
@@ -167,17 +187,20 @@ class Hash:
 
     length: int = 16
     keep_mapping: bool = False
+    cache: bool = False
 
     def __post_init__(self) -> None:
         if not 1 <= self.length <= 64:
             raise InvalidConfigError(f"length は 1–64 の範囲: {self.length}")
 
     def mask(self, text: str, entities: Sequence[Entity]) -> tuple[str, Mapping[str, str]]:
+        # cache=True: モジュールレベル LRU で SHA256 共有
+        # cache=False: 呼び出し毎に local dict で算出 → call 終了時に GC される
+        hash_fn = _sha256_hex if self.cache else _sha256_hex.__wrapped__
         surface_to_hash: dict[str, str] = {}
         for e in entities:
             if e.text not in surface_to_hash:
-                digest = hashlib.sha256(e.text.encode("utf-8")).hexdigest()
-                surface_to_hash[e.text] = digest[: self.length]
+                surface_to_hash[e.text] = hash_fn(e.text)[: self.length]
 
         replacements = [(e.start, e.end, surface_to_hash[e.text]) for e in entities]
         masked = _replace_spans(text, replacements)

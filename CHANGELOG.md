@@ -79,6 +79,10 @@
 
 ### Performance
 
+- `Hash(cache=True)` を追加し SHA256 digest をプロセス内 LRU (max 8192) で再利用可能に（#96、opt-in）:
+  - 同一 PII surface が反復するログでは SHA256 計算が省ける
+  - **セキュリティ注意**: LRU キーとして PII surface がプロセスメモリに保持される（最大 8192 件）。「detect, never retain」設計原則と背反するトレードオフがあるため、デフォルトは `cache=False`。明示的に `cache=True` を指定したときのみ有効化
+  - LRU は `Hash` インスタンスをまたいで共有される（モジュール level）
 - `_resolve_overlaps` に `max_end_so_far` 早期採用パスを追加（#95）:
   - 候補の `start` が採用済みの最大 `end` 以上のとき、線形スキャンせず O(1) で即採用
   - 完全に重ならない入力（典型的な fuseji 利用）では全体が O(n log n) に近づく

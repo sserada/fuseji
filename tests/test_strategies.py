@@ -177,3 +177,61 @@ class TestHash:
         for v in mapping.values():
             assert "taro" not in v
             assert "example" not in v
+
+
+class TestHashCache:
+    """Hash 戦略の LRU キャッシュ挙動 (#96)."""
+
+    def test_デフォルトでは_キャッシュ無効(self) -> None:
+        # cache=False (デフォルト) のとき、モジュール level LRU は触らない
+        from fuseji.strategies import _sha256_hex
+
+        before = _sha256_hex.cache_info()
+        text = "メール unique_user_xyzzy@example.com"
+        entities = [_entity("EMAIL", "unique_user_xyzzy@example.com", 4, 33)]
+        Hash().mask(text, entities)
+        after = _sha256_hex.cache_info()
+        # cache=False なので hits/misses が増えない
+        assert after == before
+
+    def test_cache_True_でモジュール_level_LRU_が使われる(self) -> None:
+        from fuseji.strategies import _sha256_hex
+
+        # 既存 cache を分離するため一意な surface を使う
+        surface = "cache_test_unique_marker@example.com"
+        text = f"x {surface}"
+        entities = [_entity("EMAIL", surface, 2, 2 + len(surface))]
+
+        _sha256_hex.cache_clear()
+        # 1 回目: miss
+        Hash(cache=True).mask(text, entities)
+        info1 = _sha256_hex.cache_info()
+        assert info1.misses >= 1
+        # 2 回目: hit（同じ surface）
+        Hash(cache=True).mask(text, entities)
+        info2 = _sha256_hex.cache_info()
+        assert info2.hits > info1.hits
+
+    def test_cache_True_と_False_は同じ_hash_を返す(self) -> None:
+        text = "メール taro@example.com"
+        entities = [_entity("EMAIL", "taro@example.com", 4, 20)]
+        masked_cached, _ = Hash(cache=True).mask(text, entities)
+        masked_uncached, _ = Hash(cache=False).mask(text, entities)
+        # 同じ surface に対する hash は cache 有無で変わらない（再現性）
+        assert masked_cached == masked_uncached
+
+    def test_cache_True_は_異なる_length_でも共有_digest(self) -> None:
+        from fuseji.strategies import _sha256_hex
+
+        surface = "shared_length_marker@example.com"
+        text = f"x {surface}"
+        entities = [_entity("EMAIL", surface, 2, 2 + len(surface))]
+
+        _sha256_hex.cache_clear()
+        # length=8 で先に digest を確保
+        Hash(length=8, cache=True).mask(text, entities)
+        info1 = _sha256_hex.cache_info()
+        # length=32 で同じ surface を使う → cache hit するはず
+        Hash(length=32, cache=True).mask(text, entities)
+        info2 = _sha256_hex.cache_info()
+        assert info2.hits > info1.hits
