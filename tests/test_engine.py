@@ -318,9 +318,10 @@ class TestVaultStrategyConflict:
             Masker(strategy=Redact())
 
     def test_警告が出ても_vault_の挙動が優先される(self) -> None:
+        vault = InMemoryVault(nonce="t")
         with pytest.warns(UserWarning):
-            m = Masker(strategy=Redact(replacement="REDACTED"), vault=InMemoryVault())
+            m = Masker(strategy=Redact(replacement="REDACTED"), vault=vault)
         result = m.mask("a@b.com")
-        # Redact ではなく VaultStrategy が動作する → <EMAIL_1> 形式
-        assert "<EMAIL_1>" in result.text
+        # Redact ではなく VaultStrategy が動作する → <EMAIL_1_t> 形式（#81 nonce 付き）
+        assert "<EMAIL_1_t>" in result.text
         assert "REDACTED" not in result.text

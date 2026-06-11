@@ -160,6 +160,7 @@ fuseji follows **detect, never retain**:
 3. **My Number and credit card numbers are excluded by default**: `MY_NUMBER` and `CREDIT_CARD` are in `InMemoryVault.DEFAULT_EXCLUDED_TYPES`. `vault.assign(...)` returns `None` for both and they are never stored.
     - `MY_NUMBER`: Japanese Number Act (番号法) compliance — fuseji must not "handle" the number in legal terms.
     - `CREDIT_CARD`: PCI DSS Requirement 3.4/3.5 alignment — Primary Account Numbers must not be stored without strong protection.
+4. **Placeholder cross-vault isolation**: `InMemoryVault` generates an 8-char hex nonce per instance and embeds it in the placeholder format `<TYPE_N_nonce>`. `restore` only matches placeholders bearing its own nonce, so an attacker cannot craft `<EMAIL_1>` in their input and have it restored to data from a different tenant's vault.
 4. **Fail-closed Langfuse adapter**: `make_mask_fn()` catches all exceptions and returns the fixed placeholder `"[fuseji: masking failed]"`. Original data is never returned.
 5. **ReDoS-free**: all regex patterns have bounded quantifiers; runtime is O(n) in input length.
 6. **Recall-biased detection**: `MY_NUMBER` recognizer emits matches even when the checksum fails (score 0.5), to minimize leakage risk.
