@@ -45,7 +45,7 @@ class JpPhoneRecognizer:
     entity_type = JP_PHONE_NUMBER
     name = "jp_phone"
 
-    def analyze(self, text: str) -> Iterable[Entity]:
+    def analyze(self, text: str, *, normalized: str | None = None) -> Iterable[Entity]:
         return regex_analyze(
             text,
             entity_type=self.entity_type,
@@ -53,6 +53,7 @@ class JpPhoneRecognizer:
             pattern=_PHONE_PATTERN,
             validate=_validate,
             normalize_fn=normalize,
+            normalized=normalized,
             require_digit_boundary=True,
             strip_separators_before_validate=True,
         )

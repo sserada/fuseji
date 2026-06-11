@@ -10,11 +10,20 @@
 - `Recognizer` プロトコルに `name` 属性（snake_case 識別子、`Entity.recognizer` に格納）を追加
 - `fuseji.recognizers.base.regex_analyze` — regex + 検証関数の共通テンプレート関数を公開。
   カスタム認識器の追加でボイラープレートを大幅に削減できる（#45）
+- ビルトイン認識器の `analyze` メソッドが `normalized: str | None = None` キーワード引数を
+  受け取れるようになった。Masker 層で事前計算した正規化済みテキストを再利用可能（#24）
 
 ### Changed
 
 - ビルトイン認識器（`email` / `credit_card` / `my_number` / `jp_phone`）を
   `regex_analyze` ベースに再実装。挙動・スコアは v0.1.0 と完全互換（#45）
+
+### Performance
+
+- `Masker.detect` が `normalize(text)` を 1 回だけ計算し、対応する認識器に
+  事前正規化済みテキストを渡すよう改良。デフォルト 5 認識器構成で従来は
+  4 回呼ばれていた `str.translate` フルスキャンが 1 回に削減される。
+  カスタム認識器との後方互換性は `inspect.signature` ベースのオプトイン検出で確保（#24）
 
 ## [0.1.0] - 2026-06-12
 

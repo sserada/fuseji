@@ -46,7 +46,7 @@ class CreditCardRecognizer:
     entity_type = CREDIT_CARD
     name = "credit_card"
 
-    def analyze(self, text: str) -> Iterable[Entity]:
+    def analyze(self, text: str, *, normalized: str | None = None) -> Iterable[Entity]:
         return regex_analyze(
             text,
             entity_type=self.entity_type,
@@ -54,5 +54,6 @@ class CreditCardRecognizer:
             pattern=_CC_PATTERN,
             validate=_validate,
             normalize_fn=normalize,
+            normalized=normalized,
             strip_separators_before_validate=True,
         )

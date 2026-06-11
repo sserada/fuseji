@@ -112,6 +112,7 @@ def regex_analyze(
     default_score: float = 1.0,
     validate: ValidateFn | None = None,
     normalize_fn: Callable[[str], str] | None = None,
+    normalized: str | None = None,
     require_digit_boundary: bool = False,
     strip_separators_before_validate: bool = False,
 ) -> Iterator[Entity]:
@@ -130,6 +131,9 @@ def regex_analyze(
         validate: マッチを検証する関数。`None` 以外を返したマッチのみ採用しその値を score にする。
         normalize_fn: マッチ前にテキストへ適用する正規化（例: `normalize`, `normalize_digits`）。
             1 文字 ↔ 1 文字の変換のみ許容（オフセット維持のため）。
+        normalized: 事前計算済みの正規化テキスト。指定時は `normalize_fn` を呼ばずに
+            この値を使う（Masker 層で 1 回計算したものを各認識器で再利用するための最適化）。
+            1 文字 ↔ 1 文字変換である前提（オフセット維持）。
         require_digit_boundary: True なら、マッチの直前/直後が数字の候補を除外。
         strip_separators_before_validate: True なら、validate に渡す前に `SEPARATOR_PATTERN` で
             ハイフン・空白を除去（digits-only に正規化）。
@@ -137,7 +141,12 @@ def regex_analyze(
     Yields:
         検出された `Entity`。`text` は元テキストの表層形で返す（正規化後ではない）。
     """
-    target = normalize_fn(text) if normalize_fn is not None else text
+    if normalized is not None:
+        target = normalized
+    elif normalize_fn is not None:
+        target = normalize_fn(text)
+    else:
+        target = text
     for m in pattern.finditer(target):
         start, end = m.start(), m.end()
         if require_digit_boundary and has_digit_boundary(target, start, end):

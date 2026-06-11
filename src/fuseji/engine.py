@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import inspect
 import warnings
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
-from .recognizers.base import default_recognizers
+from .recognizers.base import default_recognizers, normalize
 from .strategies import Placeholder, VaultStrategy
 from .types import Entity, MaskResult
 
@@ -79,6 +80,12 @@ class Masker:
         self._recognizers: tuple[Recognizer, ...] = (
             tuple(recognizers) if recognizers is not None else default_recognizers()
         )
+        # 各認識器の analyze が事前正規化済みテキスト（normalized kwarg）を
+        # 受け取れるかを 1 度だけ判定してキャッシュする。受け取れる認識器が
+        # 1 つでもあれば detect() で normalize(text) を 1 回計算して使い回す。
+        self._accepts_normalized: tuple[bool, ...] = tuple(
+            _accepts_normalized_kwarg(r) for r in self._recognizers
+        )
         self._ner = ner
         # vault があれば VaultStrategy で吸収し、戦略経路を単一化する。
         # strategy 引数は vault と排他（vault 優先、strategy 無視）。
@@ -109,8 +116,13 @@ class Masker:
             ['EMAIL', 'JP_PHONE_NUMBER']
         """
         raw: list[Entity] = []
-        for r in self._recognizers:
-            raw.extend(r.analyze(text))
+        # 認識器のいずれかが normalized を受け取れる場合は 1 回だけ計算して使い回す。
+        normalized: str | None = normalize(text) if any(self._accepts_normalized) else None
+        for r, accepts in zip(self._recognizers, self._accepts_normalized, strict=True):
+            if accepts:
+                raw.extend(r.analyze(text, normalized=normalized))  # type: ignore[call-arg]
+            else:
+                raw.extend(r.analyze(text))
         if self._ner is not None:
             raw.extend(self._ner.analyze(text))
         filtered = [e for e in raw if e.score >= self._threshold]
@@ -156,6 +168,30 @@ class Masker:
         if isinstance(data, tuple):
             return tuple(self._mask_value(v, depth=depth + 1) for v in data)
         return data
+
+
+def _accepts_normalized_kwarg(recognizer: Recognizer) -> bool:
+    """認識器の analyze が `normalized` kwarg を受け取れるか判定する。
+
+    後方互換性のため、ビルトイン認識器の事前正規化最適化（Issue #24）は
+    オプトイン方式で導入されている。`Recognizer` プロトコル本体には
+    `normalized` kwarg は含まれず、各実装が個別に受け入れる場合のみ
+    Masker が事前計算済みの `normalize(text)` を渡す。
+
+    判定基準: `analyze` のシグネチャに `normalized` という名前のパラメータが
+    存在する、または `**kwargs` を受け取る。
+    """
+    try:
+        sig = inspect.signature(recognizer.analyze)
+    except (TypeError, ValueError):
+        # built-in メソッド等で signature 取得に失敗した場合は安全側（False）
+        return False
+    for p in sig.parameters.values():
+        if p.name == "normalized":
+            return True
+        if p.kind is inspect.Parameter.VAR_KEYWORD:
+            return True
+    return False
 
 
 def _resolve_overlaps(entities: Sequence[Entity]) -> list[Entity]:

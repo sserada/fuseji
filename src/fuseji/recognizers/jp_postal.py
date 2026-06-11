@@ -38,8 +38,9 @@ class JpPostalRecognizer:
     entity_type = JP_POSTAL_CODE
     name = "jp_postal"
 
-    def analyze(self, text: str) -> Iterable[Entity]:
-        normalized = normalize(text)
+    def analyze(self, text: str, *, normalized: str | None = None) -> Iterable[Entity]:
+        if normalized is None:
+            normalized = normalize(text)
         emitted_spans: list[tuple[int, int]] = []
 
         # 〒付きを先に検出（高 score）

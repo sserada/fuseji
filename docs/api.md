@@ -255,6 +255,7 @@ def regex_analyze(
     default_score: float = 1.0,
     validate: Callable[[str], float | None] | None = None,
     normalize_fn: Callable[[str], str] | None = None,
+    normalized: str | None = None,
     require_digit_boundary: bool = False,
     strip_separators_before_validate: bool = False,
 ) -> Iterator[Entity]: ...
@@ -262,9 +263,21 @@ def regex_analyze(
 
 - `validate` が `None` でなく返り値が `None` の場合、その候補は除外
 - `normalize_fn` は 1 文字 ↔ 1 文字の変換のみ許容（オフセット維持のため）
+- `normalized` は Masker 層で事前計算した正規化済みテキストを渡すための引数。
+  指定時は `normalize_fn` を呼ばずにこの値を使う（同じ計算の重複を避ける最適化）
 - `Entity.text` は元テキストの表層形（正規化後ではない）
 
 カスタム認識器の追加例は [CONTRIBUTING.md](../CONTRIBUTING.md) を参照。
+
+### 事前正規化の最適化 (#24)
+
+`Masker.detect` は、登録された認識器のうち少なくとも 1 つが `analyze` メソッドに
+`normalized` キーワード引数を受け取れる場合、`normalize(text)` を 1 回だけ計算し
+全ての対応認識器に渡す。これにより、複数の正規表現ベース認識器が同じ正規化処理を
+独立に走らせていた状況が解消される。
+
+カスタム認識器がこの最適化に乗るには、`analyze(self, text, *, normalized=None)`
+のシグネチャを採用する。受け取らない（旧シグネチャ）認識器は従来どおり動作する。
 
 ### `default_recognizers()`
 
