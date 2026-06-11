@@ -1,5 +1,6 @@
 """fuseji — 日本語特化の PII 検出・マスキングミドルウェア."""
 
+from . import entity_types
 from .engine import Masker
 from .exceptions import FusejiError, InvalidConfigError, InvalidEntityError
 from .strategies import Hash, MaskStrategy, Placeholder, Redact, VaultStrategy
@@ -23,4 +24,5 @@ __all__ = [
     "Vault",
     "VaultStrategy",
     "__version__",
+    "entity_types",
 ]
