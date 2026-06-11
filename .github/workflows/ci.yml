@@ -37,7 +37,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python: ["3.10", "3.11", "3.12", "3.13"]
+        # Python 3.14 まで含める。test-extras（ginza）は spaCy 3.8 の wheel 制約で
+        # 3.13 までしか試せないため、本マトリクスは core のみ。
+        python: ["3.10", "3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4
       - name: Set up uv
