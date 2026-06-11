@@ -157,7 +157,9 @@ fuseji follows **detect, never retain**:
 
 1. **No PII persistence**: detected values live only in `Entity` objects in memory; never written to disk/db/logs. The library performs no network I/O.
 2. **Session-scoped vault**: `InMemoryVault` keeps mappings only in process memory. Persistence (DB/Redis) is the caller's responsibility.
-3. **My Number is excluded by default**: `MY_NUMBER` is in `InMemoryVault.DEFAULT_EXCLUDED_TYPES`. `vault.assign("MY_NUMBER", ...)` returns `None` and is never stored. This is intentional for Japanese Number Act (番号法) compliance — fuseji must not "handle" the number in legal terms.
+3. **My Number and credit card numbers are excluded by default**: `MY_NUMBER` and `CREDIT_CARD` are in `InMemoryVault.DEFAULT_EXCLUDED_TYPES`. `vault.assign(...)` returns `None` for both and they are never stored.
+    - `MY_NUMBER`: Japanese Number Act (番号法) compliance — fuseji must not "handle" the number in legal terms.
+    - `CREDIT_CARD`: PCI DSS Requirement 3.4/3.5 alignment — Primary Account Numbers must not be stored without strong protection.
 4. **Fail-closed Langfuse adapter**: `make_mask_fn()` catches all exceptions and returns the fixed placeholder `"[fuseji: masking failed]"`. Original data is never returned.
 5. **ReDoS-free**: all regex patterns have bounded quantifiers; runtime is O(n) in input length.
 6. **Recall-biased detection**: `MY_NUMBER` recognizer emits matches even when the checksum fails (score 0.5), to minimize leakage risk.

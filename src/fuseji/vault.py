@@ -68,8 +68,13 @@ class InMemoryVault:
         '山田さん'
     """
 
-    #: 復元を許さないデフォルトの type 集合（番号法対応）
-    DEFAULT_EXCLUDED_TYPES: frozenset[str] = frozenset({entity_types.MY_NUMBER})
+    #: 復元を許さないデフォルトの type 集合。
+    #: - ``MY_NUMBER``: 番号法対応で復元禁止
+    #: - ``CREDIT_CARD``: PCI DSS Requirement 3.4/3.5 で「保存禁止または強い保護下」が
+    #:   求められる PAN を mapping に残さない（#84）
+    DEFAULT_EXCLUDED_TYPES: frozenset[str] = frozenset(
+        {entity_types.MY_NUMBER, entity_types.CREDIT_CARD}
+    )
 
     def __init__(self, excluded_types: Iterable[str] | None = None) -> None:
         self._excluded: frozenset[str] = (
