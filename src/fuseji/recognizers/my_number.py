@@ -7,7 +7,7 @@ from collections.abc import Iterable
 
 from ..entity_types import MY_NUMBER
 from ..types import Entity
-from .base import has_digit_boundary, normalize_digits
+from .base import normalize_digits, regex_analyze
 
 # マイナンバーは 12 桁、セパレーターは使用しないのが標準的
 _MY_NUMBER_PATTERN = re.compile(r"\d{12}")
@@ -36,6 +36,11 @@ def _is_valid_my_number(digits: str) -> bool:
     return _checksum(digits[:11]) == int(digits[11])
 
 
+def _validate(digits: str) -> float | None:
+    """チェックディジット一致なら 0.95、不一致でも 0.5 で採用（recall 優先）."""
+    return 0.95 if _is_valid_my_number(digits) else 0.5
+
+
 class MyNumberRecognizer:
     """マイナンバー（個人番号）認識器。
 
@@ -45,21 +50,15 @@ class MyNumberRecognizer:
     """
 
     entity_type = MY_NUMBER
+    name = "my_number"
 
     def analyze(self, text: str) -> Iterable[Entity]:
-        normalized = normalize_digits(text)
-        for m in _MY_NUMBER_PATTERN.finditer(normalized):
-            start = m.start()
-            end = m.end()
-            # 直前・直後に数字がある場合は別 ID の一部の可能性が高いので除外
-            if has_digit_boundary(normalized, start, end):
-                continue
-            score = 0.95 if _is_valid_my_number(m.group()) else 0.5
-            yield Entity(
-                type=self.entity_type,
-                text=text[start:end],
-                start=start,
-                end=end,
-                score=score,
-                recognizer="my_number",
-            )
+        return regex_analyze(
+            text,
+            entity_type=self.entity_type,
+            recognizer_name=self.name,
+            pattern=_MY_NUMBER_PATTERN,
+            validate=_validate,
+            normalize_fn=normalize_digits,
+            require_digit_boundary=True,
+        )

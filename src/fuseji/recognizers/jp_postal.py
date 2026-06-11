@@ -36,6 +36,7 @@ class JpPostalRecognizer:
     """
 
     entity_type = JP_POSTAL_CODE
+    name = "jp_postal"
 
     def analyze(self, text: str) -> Iterable[Entity]:
         normalized = normalize(text)
@@ -51,7 +52,7 @@ class JpPostalRecognizer:
                 start=start,
                 end=end,
                 score=0.95,
-                recognizer="jp_postal",
+                recognizer=self.name,
             )
 
         # XXX-XXXX 形式（〒付き範囲と重複しないもの）
@@ -69,5 +70,5 @@ class JpPostalRecognizer:
                 start=start,
                 end=end,
                 score=score,
-                recognizer="jp_postal",
+                recognizer=self.name,
             )

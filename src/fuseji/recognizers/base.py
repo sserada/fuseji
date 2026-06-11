@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable, Iterator
 from typing import Protocol
 
 from ..types import Entity
@@ -18,12 +18,14 @@ class Recognizer(Protocol):
 
     属性:
         entity_type: 認識する種別名（例: ``"EMAIL"``, ``"JP_PHONE_NUMBER"``）
+        name: 認識器の識別子（snake_case）。検出された `Entity.recognizer` に格納される
 
     メソッド:
         analyze: テキストを走査し検出した `Entity` を返す。
     """
 
     entity_type: str
+    name: str
 
     def analyze(self, text: str) -> Iterable[Entity]: ...
 
@@ -93,6 +95,70 @@ def has_digit_boundary(text: str, start: int, end: int) -> bool:
     if end < len(text) and text[end].isdigit():  # noqa: SIM103
         return True
     return False
+
+
+# --- 共通テンプレート ---
+
+# validate 関数の型: 候補文字列を受け取り、有効ならスコア、無効なら None を返す
+ValidateFn = Callable[[str], "float | None"]
+
+
+def regex_analyze(
+    text: str,
+    *,
+    entity_type: str,
+    recognizer_name: str,
+    pattern: re.Pattern[str],
+    default_score: float = 1.0,
+    validate: ValidateFn | None = None,
+    normalize_fn: Callable[[str], str] | None = None,
+    require_digit_boundary: bool = False,
+    strip_separators_before_validate: bool = False,
+) -> Iterator[Entity]:
+    """正規表現マッチ + 任意の検証ロジックで Entity を生成する共通テンプレート。
+
+    regex ベースの認識器に共通する処理を集約する。各認識器はこの関数を
+    呼ぶだけで、Entity 構築・正規化・桁境界判定・セパレーター除去などの
+    定型処理を再実装する必要がなくなる。
+
+    Args:
+        text: 元テキスト。
+        entity_type: 検出する種別名（例: ``"EMAIL"``）。
+        recognizer_name: 認識器の識別子（snake_case）。`Entity.recognizer` に格納。
+        pattern: マッチに使う正規表現。`normalize_fn` 指定時は正規化後テキストに適用。
+        default_score: `validate=None` の場合に各マッチへ付与するスコア。
+        validate: マッチを検証する関数。`None` 以外を返したマッチのみ採用しその値を score にする。
+        normalize_fn: マッチ前にテキストへ適用する正規化（例: `normalize`, `normalize_digits`）。
+            1 文字 ↔ 1 文字の変換のみ許容（オフセット維持のため）。
+        require_digit_boundary: True なら、マッチの直前/直後が数字の候補を除外。
+        strip_separators_before_validate: True なら、validate に渡す前に `SEPARATOR_PATTERN` で
+            ハイフン・空白を除去（digits-only に正規化）。
+
+    Yields:
+        検出された `Entity`。`text` は元テキストの表層形で返す（正規化後ではない）。
+    """
+    target = normalize_fn(text) if normalize_fn is not None else text
+    for m in pattern.finditer(target):
+        start, end = m.start(), m.end()
+        if require_digit_boundary and has_digit_boundary(target, start, end):
+            continue
+        if validate is not None:
+            candidate = m.group()
+            if strip_separators_before_validate:
+                candidate = SEPARATOR_PATTERN.sub("", candidate)
+            score = validate(candidate)
+            if score is None:
+                continue
+        else:
+            score = default_score
+        yield Entity(
+            type=entity_type,
+            text=text[start:end],
+            start=start,
+            end=end,
+            score=score,
+            recognizer=recognizer_name,
+        )
 
 
 def default_recognizers() -> tuple[Recognizer, ...]:

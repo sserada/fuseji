@@ -7,7 +7,7 @@ from collections.abc import Iterable
 
 from ..entity_types import CREDIT_CARD
 from ..types import Entity
-from .base import SEPARATOR_PATTERN, normalize
+from .base import normalize, regex_analyze
 
 # 13-19 桁の数字、間に任意のハイフン or 空白を許容
 _CC_PATTERN = re.compile(r"\d(?:[-\s]?\d){12,18}")
@@ -26,6 +26,15 @@ def _luhn(digits: str) -> bool:
     return total % 10 == 0
 
 
+def _validate(digits: str) -> float | None:
+    """13-19 桁かつ Luhn 通過なら score=0.95、それ以外は None で除外."""
+    if not 13 <= len(digits) <= 19:
+        return None
+    if not _luhn(digits):
+        return None
+    return 0.95
+
+
 class CreditCardRecognizer:
     """クレジットカード番号認識器。
 
@@ -35,21 +44,15 @@ class CreditCardRecognizer:
     """
 
     entity_type = CREDIT_CARD
+    name = "credit_card"
 
     def analyze(self, text: str) -> Iterable[Entity]:
-        # 全角数字・全角ハイフンを正規化（1 文字 ↔ 1 文字なのでオフセット維持）
-        normalized = normalize(text)
-        for m in _CC_PATTERN.finditer(normalized):
-            digits = SEPARATOR_PATTERN.sub("", m.group())
-            if not 13 <= len(digits) <= 19:
-                continue
-            if not _luhn(digits):
-                continue
-            yield Entity(
-                type=self.entity_type,
-                text=text[m.start() : m.end()],  # 元テキストの表層を返す
-                start=m.start(),
-                end=m.end(),
-                score=0.95,
-                recognizer="credit_card",
-            )
+        return regex_analyze(
+            text,
+            entity_type=self.entity_type,
+            recognizer_name=self.name,
+            pattern=_CC_PATTERN,
+            validate=_validate,
+            normalize_fn=normalize,
+            strip_separators_before_validate=True,
+        )

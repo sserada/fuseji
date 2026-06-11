@@ -44,9 +44,47 @@ uv run pytest                    # テスト
 
 ```python
 class Recognizer(Protocol):
-    entity_type: str
+    entity_type: str  # 種別名（例: "ZIP_CODE_US"）
+    name: str         # 認識器の識別子（snake_case）。Entity.recognizer に格納
     def analyze(self, text: str) -> Iterable[Entity]: ...
 ```
+
+regex + 任意の検証ロジックで完結する認識器は、`regex_analyze` 共通テンプレートを
+使うとボイラープレートを大幅に削減できます：
+
+```python
+import re
+from fuseji.recognizers.base import normalize, regex_analyze
+
+_US_ZIP_PATTERN = re.compile(r"\d{5}(?:-\d{4})?")
+
+
+class UsZipRecognizer:
+    """US ZIP コード認識器。"""
+
+    entity_type = "ZIP_CODE_US"
+    name = "us_zip"
+
+    def analyze(self, text):
+        return regex_analyze(
+            text,
+            entity_type=self.entity_type,
+            recognizer_name=self.name,
+            pattern=_US_ZIP_PATTERN,
+            default_score=0.9,
+            # 検証関数を渡す場合（None を返すと候補を除外）
+            # validate=my_validator,
+            # 前処理で正規化したい場合
+            # normalize_fn=normalize,
+            # 前後が数字なら除外（ID の一部とみなす）
+            # require_digit_boundary=True,
+            # validate に渡す前にハイフン・空白を除去
+            # strip_separators_before_validate=True,
+        )
+```
+
+ビルトイン認識器（`email`, `credit_card`, `my_number`, `jp_phone`）はすべて
+このテンプレートで実装されています（参考: `src/fuseji/recognizers/`）。
 
 テストには全角/半角バリエーション、コンテキスト語の有無、偽陽性ケースを含めてください。
 

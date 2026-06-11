@@ -7,7 +7,7 @@ from collections.abc import Iterable
 
 from ..entity_types import JP_PHONE_NUMBER
 from ..types import Entity
-from .base import SEPARATOR_PATTERN, has_digit_boundary, normalize
+from .base import normalize, regex_analyze
 
 # 先頭 0 + 8〜10 桁 = 全 9〜11 桁。間に任意の `-` または空白を許容。
 _PHONE_PATTERN = re.compile(r"0(?:[-\s]?\d){8,10}")
@@ -43,24 +43,16 @@ class JpPhoneRecognizer:
     """
 
     entity_type = JP_PHONE_NUMBER
+    name = "jp_phone"
 
     def analyze(self, text: str) -> Iterable[Entity]:
-        normalized = normalize(text)
-        for m in _PHONE_PATTERN.finditer(normalized):
-            start = m.start()
-            end = m.end()
-            # 周辺が数字なら別 ID の一部とみなして除外
-            if has_digit_boundary(normalized, start, end):
-                continue
-            digits = SEPARATOR_PATTERN.sub("", m.group())
-            score = _validate(digits)
-            if score is None:
-                continue
-            yield Entity(
-                type=self.entity_type,
-                text=text[start:end],
-                start=start,
-                end=end,
-                score=score,
-                recognizer="jp_phone",
-            )
+        return regex_analyze(
+            text,
+            entity_type=self.entity_type,
+            recognizer_name=self.name,
+            pattern=_PHONE_PATTERN,
+            validate=_validate,
+            normalize_fn=normalize,
+            require_digit_boundary=True,
+            strip_separators_before_validate=True,
+        )

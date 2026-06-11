@@ -234,9 +234,37 @@ except FusejiError:
 
 ```python
 class Recognizer(Protocol):
-    entity_type: str
+    entity_type: str  # 種別名（例: "EMAIL"）
+    name: str         # 認識器の識別子（snake_case）。`Entity.recognizer` に格納
     def analyze(self, text: str) -> Iterable[Entity]: ...
 ```
+
+### `regex_analyze`
+
+`fuseji.recognizers.base.regex_analyze` — regex ベース認識器の共通テンプレート関数。
+正規表現マッチに加えて、文字正規化・桁境界判定・セパレーター除去・検証関数の
+適用を一括で提供する。
+
+```python
+def regex_analyze(
+    text: str,
+    *,
+    entity_type: str,
+    recognizer_name: str,
+    pattern: re.Pattern[str],
+    default_score: float = 1.0,
+    validate: Callable[[str], float | None] | None = None,
+    normalize_fn: Callable[[str], str] | None = None,
+    require_digit_boundary: bool = False,
+    strip_separators_before_validate: bool = False,
+) -> Iterator[Entity]: ...
+```
+
+- `validate` が `None` でなく返り値が `None` の場合、その候補は除外
+- `normalize_fn` は 1 文字 ↔ 1 文字の変換のみ許容（オフセット維持のため）
+- `Entity.text` は元テキストの表層形（正規化後ではない）
+
+カスタム認識器の追加例は [CONTRIBUTING.md](../CONTRIBUTING.md) を参照。
 
 ### `default_recognizers()`
 

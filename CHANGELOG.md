@@ -5,6 +5,17 @@
 
 ## [Unreleased]
 
+### Added
+
+- `Recognizer` プロトコルに `name` 属性（snake_case 識別子、`Entity.recognizer` に格納）を追加
+- `fuseji.recognizers.base.regex_analyze` — regex + 検証関数の共通テンプレート関数を公開。
+  カスタム認識器の追加でボイラープレートを大幅に削減できる（#45）
+
+### Changed
+
+- ビルトイン認識器（`email` / `credit_card` / `my_number` / `jp_phone`）を
+  `regex_analyze` ベースに再実装。挙動・スコアは v0.1.0 と完全互換（#45）
+
 ## [0.1.0] - 2026-06-12
 
 初回 PyPI リリース。日本語特化の PII 検出・マスキングミドルウェア。
