@@ -21,7 +21,10 @@ class EmailRecognizer:
     entity_type = EMAIL
     name = "email"
 
-    def analyze(self, text: str) -> Iterable[Entity]:
+    def analyze(self, text: str, *, normalized: str | None = None) -> Iterable[Entity]:
+        # EMAIL は数字・ハイフン正規化を必要としないため `normalized` は無視。
+        # シグネチャは v0.2 の Protocol 要件として明示的に受け取る。
+        del normalized
         return regex_analyze(
             text,
             entity_type=self.entity_type,

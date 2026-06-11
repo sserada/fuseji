@@ -236,8 +236,14 @@ except FusejiError:
 class Recognizer(Protocol):
     entity_type: str  # 種別名（例: "EMAIL"）
     name: str         # 認識器の識別子（snake_case）。`Entity.recognizer` に格納
-    def analyze(self, text: str) -> Iterable[Entity]: ...
+    def analyze(
+        self, text: str, *, normalized: str | None = None
+    ) -> Iterable[Entity]: ...
 ```
+
+`normalized` には `Masker.detect` が 1 回だけ計算した `normalize(text)`（全角→半角の
+数字・ハイフン正規化）が渡される。正規化を必要としない認識器（例: EMAIL）はこの
+引数を無視してよいが、シグネチャ上は必ず受け取る必要がある（v0.2 で破壊的変更）。
 
 ### `regex_analyze`
 
