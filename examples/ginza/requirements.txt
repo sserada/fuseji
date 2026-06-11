@@ -1,0 +1,1 @@
+fuseji[ginza]>=0.1.0

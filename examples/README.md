@@ -1,0 +1,21 @@
+# fuseji examples
+
+各サブディレクトリは独立した最小サンプル。`pip` だけでセットアップでき、uv は不要。
+
+| ディレクトリ | 説明 |
+| --- | --- |
+| [`langfuse_sdk/`](langfuse_sdk/) | Langfuse SDK の `mask=` パラメータに fuseji を差し込む最短サンプル |
+| [`langfuse_ingestion_callback/`](langfuse_ingestion_callback/) | Langfuse self-hosted の ingestion masking callback として fuseji-server を使う |
+| [`otel/`](otel/) | OTel Collector の processors で `POST /mask` を叩く構成 |
+| [`ginza/`](ginza/) | GiNZA バックエンド有効化で日本人名（PERSON）も検出 |
+
+## 共通のセットアップ
+
+各サンプルは独立した `requirements.txt` を持つ。Python 3.10+ の仮想環境で:
+
+```bash
+cd examples/<name>
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
