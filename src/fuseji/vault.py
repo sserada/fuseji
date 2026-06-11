@@ -84,6 +84,16 @@ class InMemoryVault:
     def excluded_types(self) -> frozenset[str]:
         return self._excluded
 
+    @property
+    def size(self) -> int:
+        """登録済み placeholder の総数。
+
+        モニタリング・長時間稼働サーバーでのメモリ使用量推定・テストで
+        clear() の効果を確認する用途に使う。excluded type 由来の固定
+        `<TYPE>` placeholder（assign が None を返したもの）はカウントされない。
+        """
+        return len(self._placeholder_to_surface)
+
     def assign(self, entity_type: str, surface: str) -> str | None:
         if entity_type in self._excluded:
             return None
