@@ -135,6 +135,41 @@ class TestRestore:
         assert v.restore("<PERSON_1>") == "<PERSON_1>"
 
 
+class TestSize:
+    def test_初期は_0(self) -> None:
+        v = InMemoryVault()
+        assert v.size == 0
+
+    def test_assign_でカウントが増える(self) -> None:
+        v = InMemoryVault()
+        v.assign("PERSON", "田中")
+        assert v.size == 1
+        v.assign("PERSON", "佐藤")
+        assert v.size == 2
+        v.assign("EMAIL", "x@y.z")
+        assert v.size == 3
+
+    def test_同一_surface_の重複_assign_は増えない(self) -> None:
+        v = InMemoryVault()
+        v.assign("PERSON", "田中")
+        v.assign("PERSON", "田中")
+        v.assign("PERSON", "田中")
+        assert v.size == 1
+
+    def test_excluded_type_の_assign_は増えない(self) -> None:
+        v = InMemoryVault()
+        v.assign("MY_NUMBER", "123456789012")  # None を返す
+        assert v.size == 0
+
+    def test_clear_で_0_に戻る(self) -> None:
+        v = InMemoryVault()
+        v.assign("PERSON", "田中")
+        v.assign("EMAIL", "x@y.z")
+        assert v.size == 2
+        v.clear()
+        assert v.size == 0
+
+
 class TestClear:
     def test_clear_は全てのマッピングを破棄(self) -> None:
         v = InMemoryVault()
