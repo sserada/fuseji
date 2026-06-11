@@ -66,3 +66,25 @@ jobs:
         run: uv sync --all-extras
       - name: pytest (all extras)
         run: uv run pytest -q
+
+  bench:
+    name: bench (informational)
+    runs-on: ubuntu-latest
+    # 情報表示のみ。回帰検知 assertion 化は別 Issue で対応。
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - name: Set up Python
+        run: uv python install 3.13
+      - name: Install dependencies
+        run: uv sync --all-extras
+      - name: pytest-benchmark (情報表示)
+        run: |
+          uv run pytest tests/bench/ --benchmark-enable \
+            --benchmark-columns=min,mean,max,stddev,median \
+            --benchmark-group-by=group \
+            --benchmark-warmup=on
