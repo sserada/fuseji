@@ -25,9 +25,7 @@ def vault_with_m_entries(request: pytest.FixtureRequest) -> InMemoryVault:
     indirect=True,
     ids=["m=10", "m=100", "m=1000"],
 )
-def test_vault_restore_scales(
-    benchmark: Any, vault_with_m_entries: InMemoryVault
-) -> None:
+def test_vault_restore_scales(benchmark: Any, vault_with_m_entries: InMemoryVault) -> None:
     """1KB の placeholder 散在テキストを m=10/100/1000 で復元."""
     # 1KB 程度の placeholder と素文の混在
     text_parts: list[str] = []
