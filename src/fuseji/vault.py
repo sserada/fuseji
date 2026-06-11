@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import secrets
 import threading
 from collections import OrderedDict
 from collections.abc import Iterable, Sequence
@@ -11,9 +12,11 @@ from typing import Protocol
 from . import entity_types
 from .exceptions import InvalidConfigError
 
-# Placeholder の正規表現。形式は ``<TYPE_N>``（TYPE は大文字スネーク、N は 1 以上の整数）。
-# restore で「登録済み placeholder のみ」を狙い撃ちするために使う。
-_PLACEHOLDER_PATTERN = re.compile(r"<[A-Z][A-Z_]*_\d+>")
+# Placeholder の基本形式。実際は `<TYPE_N_nonce>` で末尾にインスタンス固有の
+# 16 進 nonce が付く（#81、クロステナント衝突対策）。下の正規表現は型と数値の
+# パターンを抑えるためだけのリファレンスで、復元用パターンは Vault インスタンス
+# ごとに `_placeholder_pattern` として動的にコンパイルする。
+_PLACEHOLDER_PREFIX_PATTERN = r"<[A-Z][A-Z_]*_\d+"
 
 
 class Vault(Protocol):
@@ -81,15 +84,21 @@ class InMemoryVault:
         ため lock 不要。
 
     Example:
+        Placeholder の末尾には Vault インスタンス固有 nonce が付く (#81)。
+        テスト・docstring の再現性を確保するため、明示的に `nonce` を指定する:
+
         >>> from fuseji import InMemoryVault
-        >>> vault = InMemoryVault()
+        >>> vault = InMemoryVault(nonce="test")
         >>> vault.assign("PERSON", "山田")
-        '<PERSON_1>'
+        '<PERSON_1_test>'
         >>> vault.assign("PERSON", "山田")  # 同じ surface には同じ placeholder
-        '<PERSON_1>'
+        '<PERSON_1_test>'
         >>> vault.assign("MY_NUMBER", "123456789012")  # 除外 type は None
-        >>> vault.restore("<PERSON_1>さん")
+        >>> vault.restore("<PERSON_1_test>さん")
         '山田さん'
+
+        通常運用では `nonce` を省略し、`secrets.token_hex(4)` で自動生成された
+        値を使う（クロス Vault 衝突を構造的に防ぐ）。
     """
 
     #: 復元を許さないデフォルトの type 集合。
@@ -105,6 +114,7 @@ class InMemoryVault:
         excluded_types: Iterable[str] | None = None,
         *,
         max_size: int | None = None,
+        nonce: str | None = None,
     ) -> None:
         if max_size is not None and max_size < 1:
             raise InvalidConfigError(f"max_size は 1 以上の整数: {max_size}")
@@ -112,6 +122,21 @@ class InMemoryVault:
             frozenset(excluded_types) if excluded_types is not None else self.DEFAULT_EXCLUDED_TYPES
         )
         self._max_size = max_size
+        # nonce: インスタンス固有のランダム文字列。クロステナント衝突対策 (#81)。
+        # 別 Vault が生成した `<EMAIL_1>` 形式の文字列がたまたま自分のテキストに
+        # 含まれても、nonce が一致しないため `restore` で誤復元しない。
+        # `nonce=...` を明示指定するとテスト等での再現性が確保できる。
+        if nonce is None:
+            self._nonce = secrets.token_hex(4)  # 8 hex chars, 32 bits
+        else:
+            if not re.fullmatch(r"[A-Za-z0-9]+", nonce):
+                raise InvalidConfigError(f"nonce は英数字のみ: {nonce!r}")
+            self._nonce = nonce
+        # 復元用正規表現も nonce を含む形でインスタンスごとにコンパイル。
+        # これにより別 Vault 由来の placeholder は構造的にマッチしない。
+        self._placeholder_pattern = re.compile(
+            _PLACEHOLDER_PREFIX_PATTERN + r"_" + re.escape(self._nonce) + r">"
+        )
         self._counters: dict[str, int] = {}
         # OrderedDict で挿入順を保持し、`max_size` 到達時に FIFO で退避できるようにする。
         # 両辞書は assign 内で常に同時に更新されるので、挿入順が一致する前提。
@@ -122,6 +147,15 @@ class InMemoryVault:
     @property
     def excluded_types(self) -> frozenset[str]:
         return self._excluded
+
+    @property
+    def nonce(self) -> str:
+        """インスタンス固有 placeholder nonce (#81)。
+
+        `<TYPE_N_nonce>` 形式の placeholder の末尾に付く。テスト・デバッグ・
+        外部システムとの placeholder 書式の合わせ込み目的でのみ参照する。
+        """
+        return self._nonce
 
     @property
     def size(self) -> int:
@@ -189,7 +223,8 @@ class InMemoryVault:
         if cached is not None:
             return cached
         self._counters[entity_type] = self._counters.get(entity_type, 0) + 1
-        placeholder = f"<{entity_type}_{self._counters[entity_type]}>"
+        # `<TYPE_N_nonce>` 形式。nonce はインスタンス固有 (#81)。
+        placeholder = f"<{entity_type}_{self._counters[entity_type]}_{self._nonce}>"
         self._surface_to_placeholder[key] = placeholder
         self._placeholder_to_surface[placeholder] = surface
         # max_size 超過時は FIFO で最古エントリを退避（counters は維持して
@@ -206,16 +241,17 @@ class InMemoryVault:
     def restore(self, text: str) -> str:
         """text 中の登録済み placeholder を元 surface に置換して返す。
 
-        ``<TYPE_N>`` 形式に一致するトークンのみを対象とし、その中で vault に
-        登録されているものだけを置換する。未登録 placeholder（別 vault 由来、
-        excluded type の番号なし ``<TYPE>``、偶然テキストに含まれた文字列等）は
+        ``<TYPE_N_nonce>`` 形式のうち、本 Vault インスタンスの nonce に
+        一致するもののみを対象とし、その中で vault に登録されているものだけを
+        置換する。未登録 placeholder や別 Vault 由来（nonce 不一致）は構造的に
         素通しする。これにより:
 
-        - 二重マスクや別セッションの placeholder が混入しても誤復元しない
-        - ``<PERSON_1>`` が ``<PERSON_11>`` の部分一致になる誤置換を構造的に防ぐ
+        - 二重マスクや別 Vault の placeholder が混入しても誤復元しない (#81)
+        - 攻撃者が ``<EMAIL_1_xxxx>`` を推測しても nonce が一致しないと無効
+        - ``<PERSON_1_x>`` が ``<PERSON_11_x>`` の部分一致になる誤置換を構造的に防ぐ
         - 1 パスの O(n) 置換になり、登録数 m に対して O(m·n) → O(n) に改善
         """
-        return _PLACEHOLDER_PATTERN.sub(
+        return self._placeholder_pattern.sub(
             lambda m: self._placeholder_to_surface.get(m.group(), m.group()),
             text,
         )
@@ -233,13 +269,13 @@ class InMemoryVault:
 
         Example:
             >>> from fuseji import InMemoryVault
-            >>> v = InMemoryVault()
+            >>> v = InMemoryVault(nonce="test")
             >>> v.assign("PERSON", "山田")
-            '<PERSON_1>'
+            '<PERSON_1_test>'
             >>> v.clear()
-            >>> v.get("<PERSON_1>")  # クリア後は未登録扱い
+            >>> v.get("<PERSON_1_test>")  # クリア後は未登録扱い
             >>> v.assign("PERSON", "佐藤")  # カウンタも 1 から再開
-            '<PERSON_1>'
+            '<PERSON_1_test>'
         """
         with self._lock:
             self._counters.clear()

@@ -8,32 +8,32 @@ from fuseji.vault import InMemoryVault
 
 class TestMaskerWithVault:
     def test_同一表層形は同一_placeholder(self) -> None:
-        vault = InMemoryVault()
+        vault = InMemoryVault(nonce="t")
         m = Masker(vault=vault)
         # 同一メールアドレスを 2 回出す
         result = m.mask("a@b.com と a@b.com")
-        # 両方とも <EMAIL_1>
-        assert result.text == "<EMAIL_1> と <EMAIL_1>"
-        assert result.mapping["<EMAIL_1>"] == "a@b.com"
+        # 両方とも <EMAIL_1_t>
+        assert result.text == "<EMAIL_1_t> と <EMAIL_1_t>"
+        assert result.mapping["<EMAIL_1_t>"] == "a@b.com"
 
     def test_セッションを跨いだ一貫性(self) -> None:
-        vault = InMemoryVault()
+        vault = InMemoryVault(nonce="t")
         m = Masker(vault=vault)
         # 別の mask() 呼び出しでも同じ surface には同じ placeholder
         r1 = m.mask("最初: a@b.com")
         r2 = m.mask("2 回目: a@b.com")
-        assert "<EMAIL_1>" in r1.text
-        assert "<EMAIL_1>" in r2.text
+        assert "<EMAIL_1_t>" in r1.text
+        assert "<EMAIL_1_t>" in r2.text
 
     def test_異なる_surface_は別番号(self) -> None:
-        vault = InMemoryVault()
+        vault = InMemoryVault(nonce="t")
         m = Masker(vault=vault)
         result = m.mask("a@b.com と c@d.com")
-        assert "<EMAIL_1>" in result.text
-        assert "<EMAIL_2>" in result.text
+        assert "<EMAIL_1_t>" in result.text
+        assert "<EMAIL_2_t>" in result.text
 
     def test_excluded_type_はマッピングに残らない(self) -> None:
-        vault = InMemoryVault()  # MY_NUMBER がデフォルト除外
+        vault = InMemoryVault(nonce="t")  # MY_NUMBER がデフォルト除外
         m = Masker(vault=vault)
         result = m.mask("マイナンバー 123456789018")
         # MY_NUMBER は番号なしの <TYPE> 形式
@@ -42,7 +42,7 @@ class TestMaskerWithVault:
         assert "<MY_NUMBER>" not in result.mapping
 
     def test_restore_でラウンドトリップ(self) -> None:
-        vault = InMemoryVault()
+        vault = InMemoryVault(nonce="t")
         m = Masker(vault=vault)
         original = "メールは a@b.com です"
         masked = m.mask(original)
@@ -85,11 +85,11 @@ class TestMaskJson:
         assert "<EMAIL_1>" in result["users"][1]["email"]
 
     def test_vault_ありなら異なる_surface_は別番号_across_calls(self) -> None:
-        m = Masker(vault=InMemoryVault())
+        m = Masker(vault=InMemoryVault(nonce="t"))
         data = ["a@b.com", "c@d.com"]
         result = m.mask_json(data)
-        assert "<EMAIL_1>" in result[0]
-        assert "<EMAIL_2>" in result[1]
+        assert "<EMAIL_1_t>" in result[0]
+        assert "<EMAIL_2_t>" in result[1]
 
     def test_非対象型は素通し(self) -> None:
         m = Masker()

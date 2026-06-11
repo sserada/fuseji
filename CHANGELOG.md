@@ -44,6 +44,11 @@
 - `Recognizer` プロトコルの `analyze` シグネチャが `analyze(self, text: str, *, normalized: str | None = None) -> Iterable[Entity]` に変更。`normalized` kwarg を受け取らないカスタム認識器は v0.2 以降で `TypeError` になる（#93）
   - Masker 内部の `inspect.signature` ベース dispatch（`_accepts_normalized_kwarg`）を廃止し、code path がシンプルに
   - 移行方法: 既存の `def analyze(self, text)` に `*, normalized=None` を追加するだけ。`normalized` を使わない認識器は引数を無視してよい
+- `InMemoryVault` の placeholder にインスタンス固有 nonce を導入（#81）:
+  - 形式が `<TYPE_N>` → `<TYPE_N_nonce>` に変更（v0.2 breaking）。`nonce` は 8 文字 hex (32bit) を `secrets.token_hex(4)` で自動生成
+  - 別 Vault が生成した placeholder 形式の文字列を `restore` しても、nonce 不一致で素通しされる → クロステナント漏洩経路を構造的に遮断
+  - テスト用途では `InMemoryVault(nonce="...")` で明示指定可能（再現性確保）
+  - 移行方法: v0.1 の placeholder 形式に依存していたコードは `vault.nonce` プロパティ経由で動的に組み立てる
 - `Hash` 戦略のセキュリティ既定値を強化（#82）:
   - デフォルト `length` を 8 → 16（64bit）に引き上げ。低エントロピー PII（email/電話番号）へのレインボー攻撃耐性を強化
   - デフォルト `keep_mapping` を **False** に設定。`Hash().mask(...)` の戻り値 `mapping` は空 dict
