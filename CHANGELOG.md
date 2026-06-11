@@ -7,6 +7,11 @@
 
 ### Added
 
+- `InMemoryVault(max_size=N)` オプションを追加（#86）:
+  - 登録済み placeholder 数の上限を設け、上限到達後の新規 `assign` では FIFO で最古エントリを退避
+  - 長時間稼働サーバーでメモリ使用量とメモリダンプ経由の事後流出リスクを抑止する DoS 緩和策
+  - デフォルトは `None`（無制限、v0.1 互換）
+  - 番号カウンタは維持され、退避済み placeholder 番号は再利用されない（restore 衝突防止）
 - `Masker(mask_dict_keys=True)` オプションを追加（#85）:
   - `mask_json` で dict のキー（str のみ）も値と同じ戦略でマスクする
   - デフォルトは `False`（v0.1 互換、キーは素通し）

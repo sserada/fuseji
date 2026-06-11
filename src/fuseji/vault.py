@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import re
 import threading
+from collections import OrderedDict
 from collections.abc import Iterable
 from typing import Protocol
 
 from . import entity_types
+from .exceptions import InvalidConfigError
 
 # Placeholder の正規表現。形式は ``<TYPE_N>``（TYPE は大文字スネーク、N は 1 以上の整数）。
 # restore で「登録済み placeholder のみ」を狙い撃ちするために使う。
@@ -47,7 +49,11 @@ class InMemoryVault:
     - 同一 (type, surface) には常に同一 placeholder を返す。
     - placeholder 形式は ``<TYPE_N>``（N は type ごとに 1 から付番）。
     - `excluded_types` に含まれる type は `assign` で None を返し、対応表に
-      残さない。デフォルトは ``MY_NUMBER``（番号法対応で復元を許さない）。
+      残さない。デフォルトは ``{MY_NUMBER, CREDIT_CARD}``。
+    - `max_size` を指定すると、登録済み placeholder 数の上限を設ける。
+      上限到達後の新規 `assign` では FIFO で最古エントリを退避（#86）。
+      長時間稼働サーバーでメモリ使用量とメモリダンプ経由の事後流出リスクを
+      抑止する DoS 緩和策。
 
     Thread-safety:
         `assign` は内部 `threading.Lock` で保護されている。Uvicorn の
@@ -76,13 +82,23 @@ class InMemoryVault:
         {entity_types.MY_NUMBER, entity_types.CREDIT_CARD}
     )
 
-    def __init__(self, excluded_types: Iterable[str] | None = None) -> None:
+    def __init__(
+        self,
+        excluded_types: Iterable[str] | None = None,
+        *,
+        max_size: int | None = None,
+    ) -> None:
+        if max_size is not None and max_size < 1:
+            raise InvalidConfigError(f"max_size は 1 以上の整数: {max_size}")
         self._excluded: frozenset[str] = (
             frozenset(excluded_types) if excluded_types is not None else self.DEFAULT_EXCLUDED_TYPES
         )
+        self._max_size = max_size
         self._counters: dict[str, int] = {}
-        self._surface_to_placeholder: dict[tuple[str, str], str] = {}
-        self._placeholder_to_surface: dict[str, str] = {}
+        # OrderedDict で挿入順を保持し、`max_size` 到達時に FIFO で退避できるようにする。
+        # 両辞書は assign 内で常に同時に更新されるので、挿入順が一致する前提。
+        self._surface_to_placeholder: OrderedDict[tuple[str, str], str] = OrderedDict()
+        self._placeholder_to_surface: OrderedDict[str, str] = OrderedDict()
         self._lock = threading.Lock()
 
     @property
@@ -121,6 +137,12 @@ class InMemoryVault:
             placeholder = f"<{entity_type}_{self._counters[entity_type]}>"
             self._surface_to_placeholder[key] = placeholder
             self._placeholder_to_surface[placeholder] = surface
+            # max_size 超過時は FIFO で最古エントリを退避（counters は維持して
+            # 新規 placeholder 番号の単調増加を保つ — 退避済み番号は再利用しない）
+            if self._max_size is not None:
+                while len(self._placeholder_to_surface) > self._max_size:
+                    self._surface_to_placeholder.popitem(last=False)
+                    self._placeholder_to_surface.popitem(last=False)
             return placeholder
 
     def get(self, placeholder: str) -> str | None:
