@@ -118,6 +118,77 @@ class TestBodySizeLimit:
         assert res.status_code == 413
         assert res.json()["detail"] == "payload too large"
 
+    def test_chunked_でも上限を超えれば_413(self) -> None:
+        """Content-Length を欠いた chunked リクエストでも上限が効く (#87).
+
+        小さい max_bytes に絞り、TestClient 経由で大きいデータを送る。
+        TestClient は通常 Content-Length を付けるため、Content-Length ヘッダを
+        明示的に削除した状況のシミュレーションは httpx の制約で難しい。
+        ここでは max_bytes を 50 に絞り、累積バイト数判定が機能する経路を
+        通すことで body stream を見るパスをカバーする。
+        """
+        from fuseji.server.app import create_app
+
+        # max=50 で 200 バイトの body を送る → 413
+        small_app = create_app(max_body_bytes=50)
+        c = TestClient(small_app)
+        res = c.post("/mask", json={"data": "a" * 200})
+        assert res.status_code == 413
+        assert res.json()["detail"] == "payload too large"
+
+    def test_ASGI_middleware_直接呼び出しで_受信途中で打ち切る(self) -> None:
+        """pure ASGI 経路で、Content-Length 未宣言かつ累積で上限超過するケース."""
+        import asyncio
+        import json
+        from typing import Any
+
+        from fuseji.server.app import BodySizeLimitMiddleware
+
+        # ダミー ASGI アプリ（呼ばれたら 200 OK を返す）
+        called: dict[str, bool] = {"app_called": False}
+
+        async def dummy_app(scope: object, receive: object, send: Any) -> None:
+            called["app_called"] = True
+            await send({"type": "http.response.start", "status": 200, "headers": []})
+            await send({"type": "http.response.body", "body": b"ok"})
+
+        middleware = BodySizeLimitMiddleware(dummy_app, max_bytes=10)
+
+        # 累積 30 バイトの chunked body を受信する receive を作る
+        chunks = [
+            {"type": "http.request", "body": b"a" * 5, "more_body": True},
+            {"type": "http.request", "body": b"b" * 10, "more_body": True},
+            {"type": "http.request", "body": b"c" * 15, "more_body": False},
+        ]
+        idx = {"i": 0}
+
+        async def receive() -> dict[str, Any]:
+            i = idx["i"]
+            idx["i"] += 1
+            return chunks[i]
+
+        # send 内容を捕捉
+        sent: list[dict[str, Any]] = []
+
+        async def send(msg: dict[str, Any]) -> None:
+            sent.append(msg)
+
+        scope = {
+            "type": "http",
+            "headers": [],  # Content-Length なし
+            "method": "POST",
+            "path": "/mask",
+        }
+        asyncio.run(middleware(scope, receive, send))
+
+        # 下流アプリは呼ばれなかった
+        assert called["app_called"] is False
+        # 413 が返った
+        assert any(m["type"] == "http.response.start" and m["status"] == 413 for m in sent)
+        body_msgs = [m for m in sent if m["type"] == "http.response.body"]
+        assert len(body_msgs) == 1
+        assert json.loads(body_msgs[0]["body"])["detail"] == "payload too large"
+
 
 class TestCreateAppFactory:
     def test_create_app_でカスタム_masker_を注入できる(self) -> None:
