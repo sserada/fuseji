@@ -60,3 +60,16 @@ def test_resolve_overlaps_dense(benchmark: Any, n: int) -> None:
     entities = _build_entities(n, overlap_ratio=0.5)
     benchmark.group = f"resolve_overlaps_dense_n{n}"
     benchmark(_resolve_overlaps, entities)
+
+
+@pytest.mark.parametrize("n", [100, 1000])
+def test_resolve_overlaps_full_overlap(benchmark: Any, n: int) -> None:
+    """全 entity が前隣と被る worst-case (#181).
+
+    overlap_ratio=1.0 で毎ステップ span 半分を被せる。`_resolve_overlaps` の
+    線形スキャンが採用済み span との競合判定で **最多回数** 走る経路。
+    sweep-line 化 (#95) の改善対象。
+    """
+    entities = _build_entities(n, overlap_ratio=1.0)
+    benchmark.group = f"resolve_overlaps_full_overlap_n{n}"
+    benchmark(_resolve_overlaps, entities)

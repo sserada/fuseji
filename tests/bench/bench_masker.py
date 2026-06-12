@@ -41,3 +41,21 @@ def test_detect_only(benchmark: Any, masker: Masker, kb: int) -> None:
     text = _build_text(kb)
     benchmark.group = f"detect_{kb}KB"
     benchmark(masker.detect, text)
+
+
+def _build_many_unique_pii(n: int) -> str:
+    """n 個の unique email を 1 つのテキストに並べる worst-case (#181).
+
+    同一 surface の再出現がないため Placeholder の counter / assigned dict が
+    線形に増え、Vault assign 経路ではロック取得が n 回連続する。
+    cache hit が一切起きないパスの計測。
+    """
+    return " ".join(f"user{i}@example.com" for i in range(n))
+
+
+@pytest.mark.parametrize("n", [100, 1000])
+def test_masker_many_unique_surfaces(benchmark: Any, masker: Masker, n: int) -> None:
+    """同一 surface が再出現しない worst-case Masker.mask (#181)."""
+    text = _build_many_unique_pii(n)
+    benchmark.group = f"masker_unique_surfaces_n{n}"
+    benchmark(masker.mask, text)

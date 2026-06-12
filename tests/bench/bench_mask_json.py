@@ -55,3 +55,31 @@ def test_mask_json_nested(benchmark: Any, masker: Masker, depth: int) -> None:
     data = _build_nested(depth)
     benchmark.group = f"mask_json_nested_d{depth}"
     benchmark(masker.mask_json, data)
+
+
+def _build_wide_and_deep(n_leaves: int, depth: int) -> dict[str, Any]:
+    """worst-case: 幅 n_leaves × 深さ depth の入れ子 dict (#181).
+
+    各レベルで n_leaves 個の flat leaf を持ちつつ、`nested` キーで次の段に続ける。
+    再帰 (mask_json の per-level dict 再構築) と per-leaf 処理 (isinstance 判定 +
+    Masker.mask 呼び出し) の **相乗効果** を計測する。
+    """
+    inner: Any = "メール: taro@example.com"
+    for _ in range(depth):
+        layer = _build_flat(n_leaves)
+        layer["nested"] = inner
+        inner = layer
+    assert isinstance(inner, dict)
+    return inner
+
+
+def test_mask_json_wide_and_deep(benchmark: Any, masker: Masker) -> None:
+    """幅 100 × 深さ 10 の worst-case 入れ子 (#181).
+
+    既存の flat (100/1000) / nested (3/10) は独立次元のみカバーしていたが、
+    本ケースは「dict キーを伴う再帰」+ 「per-leaf レイテンシ」両方を同時に踏む
+    pathological 構造。
+    """
+    data = _build_wide_and_deep(n_leaves=100, depth=10)
+    benchmark.group = "mask_json_worst_case"
+    benchmark(masker.mask_json, data)
