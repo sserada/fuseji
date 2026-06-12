@@ -128,13 +128,17 @@ curl -X POST http://localhost:8000/mask \
 
 OpenAPI: `http://localhost:8000/openapi.json`
 
-### Operational limits
+### Operational limits and authentication
 
 | Limit | Default | Env var / API | On overflow |
 | --- | --- | --- | --- |
 | Request body size | 1 MB | `FUSEJI_SERVER_MAX_BODY_BYTES` / `create_app(max_body_bytes=...)` | HTTP 413 |
 | Per-request processing time | 30 s | `FUSEJI_SERVER_TIMEOUT_SECONDS` / `create_app(timeout_seconds=...)` | HTTP 504 |
 | `mask_json` recursion depth | 100 | `Masker(max_json_depth=...)` | fail-closed with `"[fuseji: too deep]"` |
+| API key authentication | disabled | `FUSEJI_API_KEY` / `create_app(api_key=...)` | HTTP 401 on mismatch |
+| CORS allowed origins | disabled | `FUSEJI_CORS_ORIGINS` (CSV) / `create_app(cors_origins=...)` | unlisted origins get no ACAO header |
+
+> ⚠️ **For internet-exposed deployments**, always set both `FUSEJI_API_KEY` and `FUSEJI_CORS_ORIGINS`. The server is designed as a trusted-boundary sidecar.
 
 ## Security and legal notes
 
@@ -155,9 +159,10 @@ See [docs/design.md](docs/design.md). v0.x non-goals: prompt-injection guardrail
 
 ## Roadmap
 
-- **v0.1** (current): regex/checksum recognizers, GiNZA PERSON, Placeholder/Redact/Hash, Vault, Langfuse adapter, FastAPI server, CI
-- **v0.2**: `JP_ADDRESS`, Docker image for ingestion callback, OTel example, Faker strategy, fuseji-bench
-- **v0.3**: NER backend comparison, structured-field-aware masking, batch API
+- **v0.1** (shipped to PyPI): regex/checksum recognizers, GiNZA PERSON, Placeholder/Redact/Hash, Vault, Langfuse adapter, FastAPI server, CI
+- **v0.2** (dev complete, next release): expanded Recognizer protocol (`name` + `regex_analyze` factory), security hardening (Vault placeholder nonce / Hash mapping opt-in / CC excluded by default / API-key auth + CORS / pure-ASGI chunked-body limit / opt-in mask_json dict-key masking), perf improvements (one-shot `normalize` / `assign_many` bulk / `_resolve_overlaps` early-exit / opt-in Hash LRU), quality (doctest + 90% coverage gate / Unicode coverage / cross-recognizer regression / bench expansion)
+- **v0.3** (candidate): more recognizers (`JP_ADDRESS`, corporate number), Faker strategy, Docker image for ingestion callback, OTel example
+- **v0.4+** (candidate): NER backend comparison (BERT-NER / GLiNER-ja fine-tune), structured-field-aware masking, batch API, true sweep-line `_resolve_overlaps`
 
 ## Contributing
 
