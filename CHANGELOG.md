@@ -7,6 +7,12 @@
 
 ### Breaking Changes
 
+- `FakerStrategy` のデフォルト `salt` をプロセス毎ランダム化（#145、security fix）:
+  - 旧: `salt = "fuseji-default-salt-please-override"`（ソース公開の固定文字列）
+  - 新: `field(default_factory=secrets.token_hex(32))`（256bit のインスタンス毎ランダム値）
+  - 旧デフォルトでは fake と salt から候補 surface 辞書攻撃で逆引きできる経路があった (CWE-330 / CWE-798)
+  - 副次変更: `repr(FakerStrategy(...))` から salt を `<redacted>` で抑制（ログ漏洩から逆引き経路を遮断）
+  - 移行方法: マルチプロセス間で同じ fake を返したい用途（永続化・分散実行）は `FakerStrategy(salt="shared-secret")` で明示的に渡す（秘密として保護すること）。単一プロセス内の決定性は従来通り
 - `Entity` と `MaskResult` の `__repr__` を PII safe に変更（#144、security fix）:
   - `repr(entity)` は `text='...'` ではなく `text=<len=N hash=XXXXXXXX>` 形式の安全要約を返す
   - `repr(result)` は `entities=<count=N>` / `mapping=<count=M>` のみで中身を出さない
