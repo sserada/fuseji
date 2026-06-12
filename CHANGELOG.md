@@ -14,6 +14,11 @@
   - `EMAIL` は `safe_email` (RFC 6761 reserved domain)
   - 決定的モード (`deterministic=True` デフォルト): 同一 surface に同一 fake → マルチターンの context preservation
   - `from fuseji.faker_strategy import FakerStrategy` で利用
+- `JpAddressRecognizer`（日本の住所、`JP_ADDRESS`、opt-in）を追加（#127、minimum viable）:
+  - 47 都道府県 + 市区町村 + 任意の番地パターンを正規表現で検出
+  - スコア: 番地 + コンテキスト語 (住所/在所/居住地) ありで 0.9、番地のみで 0.7、都道府県 + 市区町村のみで 0.5
+  - 公開情報のため `default_recognizers()` には含めず明示的に組み込む
+  - **既知制限**: 北海道の条記法、漢数字、マンション名、都道府県省略の住所は未対応。dictionary-based 高精度版は別 Issue で検討予定
 - `CorporateNumberRecognizer`（法人番号、`CORPORATE_NUMBER`）を追加（#126）:
   - 国税庁公開仕様の 13 桁チェックディジット検証
   - `MY_NUMBER` と同じく recall 優先（不一致でも score 0.5 で残す）

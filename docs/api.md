@@ -377,6 +377,16 @@ from fuseji.recognizers.corporate_number import CorporateNumberRecognizer
 masker = Masker(recognizers=[*default_recognizers(), CorporateNumberRecognizer()])
 ```
 
+- `JpAddressRecognizer`（`entity_type="JP_ADDRESS"`、score=0.9/0.7/0.5、47 都道府県 + 市区町村 + 番地 パターン、#127）。**minimum viable 版**: 北海道の条記法、漢数字、マンション名、都道府県省略の住所は未対応。dictionary-based 高精度版は将来の課題:
+
+```python
+from fuseji import Masker
+from fuseji.recognizers.base import default_recognizers
+from fuseji.recognizers.jp_address import JpAddressRecognizer
+
+masker = Masker(recognizers=[*default_recognizers(), JpAddressRecognizer()])
+```
+
 ---
 
 ## NER バックエンド

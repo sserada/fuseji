@@ -25,6 +25,8 @@ CREDIT_CARD: str = "CREDIT_CARD"
 MY_NUMBER: str = "MY_NUMBER"
 #: 法人番号（13 桁、国税庁が公開、v0.3 で opt-in 認識器を追加 #126）
 CORPORATE_NUMBER: str = "CORPORATE_NUMBER"
+#: 日本の住所（都道府県 prefix + 市区町村 + 番地、v0.3 で opt-in 認識器を追加 #127）
+JP_ADDRESS: str = "JP_ADDRESS"
 #: 日本の電話番号（携帯・固定・フリーダイヤル・ナビダイヤル）
 JP_PHONE_NUMBER: str = "JP_PHONE_NUMBER"
 #: 日本の郵便番号
@@ -41,6 +43,7 @@ __all__ = [
     "CORPORATE_NUMBER",
     "CREDIT_CARD",
     "EMAIL",
+    "JP_ADDRESS",
     "JP_PHONE_NUMBER",
     "JP_POSTAL_CODE",
     "MY_NUMBER",
