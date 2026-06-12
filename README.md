@@ -84,15 +84,22 @@ for e in result.entities:
 ```python
 from fuseji import Masker, InMemoryVault
 
-vault = InMemoryVault()  # MY_NUMBER はデフォルトで復元不可（番号法対応）
+# MY_NUMBER と CREDIT_CARD はデフォルトで Vault 除外（番号法 + PCI DSS 整合、復元不可）
+vault = InMemoryVault()
 masker = Masker(vault=vault)
 
-r1 = masker.mask("田中さんと佐藤さん")          # <PERSON_1>さんと<PERSON_2>さん（GiNZA 有効時）
-r2 = masker.mask("田中さんに連絡して")          # <PERSON_1>さんに連絡して（一貫性維持）
+r1 = masker.mask("田中さんと佐藤さん")
+# 例: 「<PERSON_1_a3f9b2c4>さんと<PERSON_2_a3f9b2c4>さん」(GiNZA 有効時)
+r2 = masker.mask("田中さんに連絡して")
+# 例: 「<PERSON_1_a3f9b2c4>さんに連絡して」(一貫性維持)
 
-# LLM 応答から復元
-restored = vault.restore("<PERSON_1>さんへ返信しました")
-# 田中さんへ返信しました
+# LLM 応答（r1.text を含むテキスト）から復元
+restored = vault.restore(r1.text)
+# 田中さんと佐藤さん
+
+# placeholder 末尾の nonce は Vault インスタンス固有（v0.2 で導入）。
+# 別 Vault が生成した placeholder 形式は restore で素通しされ、
+# クロステナント漏洩を構造的に防ぐ。
 ```
 
 ### マスキング戦略
@@ -100,9 +107,10 @@ restored = vault.restore("<PERSON_1>さんへ返信しました")
 ```python
 from fuseji import Masker, Placeholder, Redact, Hash
 
-Masker(strategy=Placeholder())  # <EMAIL_1> 形式（デフォルト）
-Masker(strategy=Redact())       # [REDACTED]
-Masker(strategy=Hash(length=8)) # SHA256 ハッシュ先頭 8 文字
+Masker(strategy=Placeholder())                       # <EMAIL_1> 形式（デフォルト）
+Masker(strategy=Redact())                            # [REDACTED]
+Masker(strategy=Hash())                              # SHA256 16 文字（v0.2 デフォルト、レインボー耐性）
+Masker(strategy=Hash(length=8, keep_mapping=True))   # v0.1 互換: 8 文字 + 逆引き mapping
 ```
 
 ## Langfuse SDK 連携
