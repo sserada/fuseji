@@ -97,8 +97,8 @@ class InMemoryVault:
         >>> vault.restore("<PERSON_1_test>さん")
         '山田さん'
 
-        通常運用では `nonce` を省略し、`secrets.token_hex(4)` で自動生成された
-        値を使う（クロス Vault 衝突を構造的に防ぐ）。
+        通常運用では `nonce` を省略し、`secrets.token_hex(16)` (128-bit) で
+        自動生成された値を使う（クロス Vault 衝突を構造的に防ぐ、#185）。
     """
 
     #: 復元を許さないデフォルトの type 集合。
@@ -127,7 +127,11 @@ class InMemoryVault:
         # 含まれても、nonce が一致しないため `restore` で誤復元しない。
         # `nonce=...` を明示指定するとテスト等での再現性が確保できる。
         if nonce is None:
-            self._nonce = secrets.token_hex(4)  # 8 hex chars, 32 bits
+            # 128-bit (32 hex chars) で誕生日衝突耐性を確保 (#185)。
+            # 32-bit (旧 secrets.token_hex(4)) は ~65k Vault で衝突確率 50% に達する
+            # ため、マルチテナント / テスト sweep / 高並列運用での誤復元リスクを
+            # 構造的に塞ぐ。1 placeholder あたり 24 文字増えるが、LLM payload では軽微。
+            self._nonce = secrets.token_hex(16)  # 32 hex chars, 128 bits
         else:
             if not re.fullmatch(r"[A-Za-z0-9]+", nonce):
                 raise InvalidConfigError(f"nonce は英数字のみ: {nonce!r}")

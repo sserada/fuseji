@@ -29,6 +29,11 @@
 
 ### Added
 
+- `InMemoryVault` の nonce を 32-bit から 128-bit に拡張（#185、security）:
+  - `secrets.token_hex(4)` (8 hex chars / 32-bit、誕生日衝突 ~65k 個) → `secrets.token_hex(16)` (32 hex chars / 128-bit、衝突確率 2^-128 で実質ゼロ)
+  - クロステナント・マルチ Vault 運用 (マルチテナント SaaS / 並列テスト sweep) で誤 restore リスクを構造的に塞ぐ
+  - placeholder 長は 24 文字伸びるが、LLM payload では軽微 (semantic は不変)
+  - 明示指定 (`InMemoryVault(nonce="test")`) は引き続き任意の英数字を受け付ける
 - Hypothesis ベースの property-based テストを追加（#183、quality）:
   - `tests/test_properties.py` 新設、9 件の不変条件 (invariant) をランダム生成入力で検証
   - 対象: `normalize` (文字数維持・ASCII 恒等) / `Hash` 戦略 (決定性・出力長) / `InMemoryVault.assign` (冪等性・unique 性) / `MyNumberRecognizer` (12 桁境界) / `CorporateNumberRecognizer` (13 桁境界)

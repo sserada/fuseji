@@ -458,13 +458,13 @@ class TestAssignMany:
 class TestPlaceholderNonce:
     """Vault placeholder の instance nonce (#81)."""
 
-    def test_デフォルトでは_8文字_hex_の_nonce_が自動生成される(self) -> None:
+    def test_デフォルトでは_32文字_hex_の_nonce_が自動生成される(self) -> None:
+        # #185: 128-bit (secrets.token_hex(16)) で 32 文字 [0-9a-f]
         v = InMemoryVault()
-        # secrets.token_hex(4) は 8 文字 [0-9a-f]
-        assert re.fullmatch(r"[0-9a-f]{8}", v.nonce)
+        assert re.fullmatch(r"[0-9a-f]{32}", v.nonce)
 
     def test_別インスタンスは別_nonce(self) -> None:
-        # 2 つの InMemoryVault が同じ nonce を生成する確率は 2**-32 で実質ゼロ
+        # 2 つの InMemoryVault が同じ nonce を生成する確率は 2**-128 で実質ゼロ (#185)
         v1 = InMemoryVault()
         v2 = InMemoryVault()
         assert v1.nonce != v2.nonce
