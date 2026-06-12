@@ -7,6 +7,13 @@
 
 ### Breaking Changes
 
+- `Entity` と `MaskResult` の `__repr__` を PII safe に変更（#144、security fix）:
+  - `repr(entity)` は `text='...'` ではなく `text=<len=N hash=XXXXXXXX>` 形式の安全要約を返す
+  - `repr(result)` は `entities=<count=N>` / `mapping=<count=M>` のみで中身を出さない
+  - `Entity.text` への属性参照は従来通り（API は変わらず）。`logger.info('%s', entity)` / pytest assert dump / FastAPI 500 traceback で原 PII が偶発的に刻まれるのを防ぐ
+  - デバッグ用に `Entity.unsafe_repr()` を opt-in で別途用意。呼び出し元が PII 露出責任を負う
+  - 移行方法: テストやログで `repr(entity)` の文字列に依存していた場合は `entity.unsafe_repr()` に書き換える、または `entity.text` を直接参照する
+  - OWASP ASVS V7.1.1 / CWE-209 / CWE-532 対応
 - `POST /detect` レスポンスから原 PII surface をデフォルト除去（#143、security fix）:
   - `DetectResponse.entities[].text` がデフォルトで `null` を返すよう変更（旧: 原 surface を平文で返却）
   - 「detect, never retain」原則 / OWASP LLM02:2025 / CWE-200 への対応。クライアントは原テキストを自身で保持しているため、`type`/`start`/`end`/`score`/`recognizer` のみで再構築できる
