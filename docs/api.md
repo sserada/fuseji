@@ -444,7 +444,7 @@ langfuse = Langfuse(mask=make_mask_fn())
 ### エンドポイント
 
 - `POST /mask` — 任意 JSON を `Masker.mask_json` で再帰マスク
-- `POST /detect` — テキストから entity 一覧を返す
+- `POST /detect` — テキストから entity 一覧を返す。**デフォルトでは `entities[].text` は `null`** (#143、原 PII を漏出させない)。`type` / `start` / `end` / `score` / `recognizer` は常に返る。`detect_include_surface=True` または `FUSEJI_DETECT_INCLUDE_SURFACE=1` で opt-in 可（高センシティビティ type は `<redacted>` 固定）
 - `GET /healthz` — `{"status": "ok"}` を返す
 - `GET /openapi.json` — OpenAPI 自動生成スキーマ
 
@@ -465,6 +465,7 @@ def create_app(
     timeout_seconds: float | None = None,
     api_key: str | None = None,
     cors_origins: Sequence[str] | None = None,
+    detect_include_surface: bool | None = None,
 ) -> FastAPI: ...
 ```
 
@@ -475,6 +476,7 @@ def create_app(
 | `timeout_seconds` | `FUSEJI_SERVER_TIMEOUT_SECONDS` or 30 秒 | 1 リクエスト処理が超過すると HTTP 504 |
 | `api_key` | `FUSEJI_API_KEY` or `None` (無認証) | `X-API-Key` ヘッダで認証。`/healthz` `/openapi.json` は保護対象外 |
 | `cors_origins` | `FUSEJI_CORS_ORIGINS`（カンマ区切り）or `None` (CORS 無効) | CORS 許可オリジン。インターネット公開時は明示必須 |
+| `detect_include_surface` | `FUSEJI_DETECT_INCLUDE_SURFACE` or `False` | `/detect` レスポンスに原 PII surface (`text`) を含めるか。デフォルト無効で「detect, never retain」を遵守。`True` でも `MY_NUMBER` / `CREDIT_CARD` / `CORPORATE_NUMBER` は `<redacted>` 固定 (#143) |
 
 ```python
 from fuseji import Masker, InMemoryVault

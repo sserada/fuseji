@@ -30,8 +30,18 @@ _ENV_TIMEOUT = "FUSEJI_SERVER_TIMEOUT_SECONDS"
 _ENV_API_KEY = "FUSEJI_API_KEY"
 # CORS allow_origins。未設定なら CORS 無効（同一オリジンのみ）。
 _ENV_CORS_ORIGINS = "FUSEJI_CORS_ORIGINS"
+# /detect レスポンスに原 PII surface を含めるか (#143)。デフォルト無効。
+# `FUSEJI_DETECT_INCLUDE_SURFACE=1` で opt-in。create_app(detect_include_surface=True) でも可。
+_ENV_DETECT_INCLUDE_SURFACE = "FUSEJI_DETECT_INCLUDE_SURFACE"
 # 認証対象のパス（healthz / openapi.json は対象外で誰でも叩ける）
 _PROTECTED_PATHS: frozenset[str] = frozenset({"/mask", "/detect"})
+
+# /detect レスポンスで opt-in 時にも固定マスクする高センシティビティ type (#143)。
+# FakerStrategy と同じ集合: 番号法対応 + Luhn 通過の架空 CC を扱わない。
+_DETECT_FIXED_MASK_TYPES: frozenset[str] = frozenset(
+    {"MY_NUMBER", "CREDIT_CARD", "CORPORATE_NUMBER"}
+)
+_DETECT_REDACTED_LABEL: str = "<redacted>"
 
 
 class BodySizeLimitMiddleware:
@@ -175,6 +185,17 @@ def _api_key_from_env() -> str | None:
     return raw
 
 
+def _detect_include_surface_from_env() -> bool:
+    """環境変数 `FUSEJI_DETECT_INCLUDE_SURFACE` の真偽値解釈 (#143).
+
+    `1` / `true` / `yes` / `on` を真扱い、それ以外（未設定含む）は偽。
+    """
+    raw = os.environ.get(_ENV_DETECT_INCLUDE_SURFACE)
+    if raw is None:
+        return False
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
 def _cors_origins_from_env() -> list[str] | None:
     """環境変数 `FUSEJI_CORS_ORIGINS` をカンマ区切りで読み取る。未設定なら None。
 
@@ -257,10 +278,16 @@ class DetectRequest(BaseModel):
 
 
 class EntityModel(BaseModel):
-    """検出された Entity の JSON 表現."""
+    """検出された Entity の JSON 表現.
+
+    `text` は省略可能 (#143)。デフォルトでは原 PII surface を返さない
+    (`detect, never retain` 原則 / OWASP LLM02:2025 / CWE-200 への対応)。
+    `create_app(detect_include_surface=True)` または環境変数
+    `FUSEJI_DETECT_INCLUDE_SURFACE=1` で opt-in した場合のみ含める。
+    """
 
     type: str
-    text: str
+    text: str | None = None
     start: int
     end: int
     score: float
@@ -279,6 +306,20 @@ class HealthResponse(BaseModel):
     status: str
 
 
+def _resolve_detect_text(entity_type: str, surface: str, include_surface: bool) -> str | None:
+    """/detect レスポンスの `text` フィールド値を決定する (#143).
+
+    - `include_surface=False` (デフォルト): すべて None を返し、原 PII を露出させない
+    - `include_surface=True`: 高センシティビティ type は `<redacted>` 固定マスク、
+      それ以外は原 surface を返す
+    """
+    if not include_surface:
+        return None
+    if entity_type in _DETECT_FIXED_MASK_TYPES:
+        return _DETECT_REDACTED_LABEL
+    return surface
+
+
 def create_app(
     masker: Masker | None = None,
     *,
@@ -286,6 +327,7 @@ def create_app(
     timeout_seconds: float | None = None,
     api_key: str | None = None,
     cors_origins: Sequence[str] | None = None,
+    detect_include_surface: bool | None = None,
 ) -> FastAPI:
     """FastAPI アプリケーションを構築して返す（factory）。
 
@@ -307,6 +349,12 @@ def create_app(
         cors_origins: CORS で許可するオリジンのリスト。`None` のとき環境変数
             `FUSEJI_CORS_ORIGINS`（カンマ区切り）から取得し、それも未設定なら
             CORS 無効（同一オリジンのみ）。インターネット公開時の必須設定。
+        detect_include_surface: `/detect` レスポンスに原 PII surface (`text`) を
+            含めるか (#143)。`None` のとき環境変数 `FUSEJI_DETECT_INCLUDE_SURFACE`
+            を参照し、それも未設定なら **False**（デフォルトで省略）。`True` で
+            opt-in した場合も高センシティビティ type
+            (`MY_NUMBER` / `CREDIT_CARD` / `CORPORATE_NUMBER`) は `<redacted>`
+            固定。「detect, never retain」 / OWASP LLM02:2025 / CWE-200 対応。
 
     Returns:
         ルート登録済みの `FastAPI` インスタンス。
@@ -330,6 +378,11 @@ def create_app(
         actual_cors_origins = list(cors_origins)
     else:
         actual_cors_origins = _cors_origins_from_env()
+    actual_detect_include_surface: bool = (
+        detect_include_surface
+        if detect_include_surface is not None
+        else _detect_include_surface_from_env()
+    )
 
     new_app = FastAPI(
         title="fuseji",
@@ -359,13 +412,18 @@ def create_app(
 
     @new_app.post("/detect", response_model=DetectResponse)
     def detect_endpoint(req: DetectRequest) -> DetectResponse:
-        """テキストから PII を検出して entity 一覧を返す。"""
+        """テキストから PII を検出して entity 一覧を返す。
+
+        デフォルトで原 PII surface (`text`) はレスポンスに含めない (#143)。
+        `detect_include_surface=True` を opt-in したときのみ含めるが、
+        高センシティビティ type は `<redacted>` で固定マスクする。
+        """
         entities = actual_masker.detect(req.text)
         return DetectResponse(
             entities=[
                 EntityModel(
                     type=e.type,
-                    text=e.text,
+                    text=_resolve_detect_text(e.type, e.text, actual_detect_include_surface),
                     start=e.start,
                     end=e.end,
                     score=e.score,

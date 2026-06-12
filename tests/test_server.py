@@ -55,14 +55,16 @@ class TestMaskEndpoint:
 
 
 class TestDetectEndpoint:
-    def test_entity_を返す(self, client: TestClient) -> None:
+    def test_entity_を返す_デフォルトでは_text_は_None(self, client: TestClient) -> None:
+        # #143: デフォルトで原 PII surface は返さない
         res = client.post("/detect", json={"text": "メール: taro@example.com"})
         assert res.status_code == 200
         body = res.json()
         assert len(body["entities"]) == 1
         e = body["entities"][0]
         assert e["type"] == "EMAIL"
-        assert e["text"] == "taro@example.com"
+        assert e["text"] is None
+        # オフセット系メタは残る
         assert "start" in e
         assert "end" in e
         assert "score" in e
@@ -86,6 +88,63 @@ class TestDetectEndpoint:
     def test_text_欠落は_422(self, client: TestClient) -> None:
         res = client.post("/detect", json={})
         assert res.status_code == 422
+
+
+class TestDetectIncludeSurface:
+    """#143: detect_include_surface opt-in 挙動."""
+
+    def test_opt_in_すると_原_surface_が_含まれる(self) -> None:
+        from fuseji.server.app import create_app
+
+        c = TestClient(create_app(detect_include_surface=True))
+        res = c.post("/detect", json={"text": "メール: taro@example.com"})
+        body = res.json()
+        e = body["entities"][0]
+        assert e["type"] == "EMAIL"
+        assert e["text"] == "taro@example.com"
+
+    def test_opt_in_でも_高センシティビティ_type_は_redacted(self) -> None:
+        from fuseji.server.app import create_app
+
+        c = TestClient(create_app(detect_include_surface=True))
+        # MY_NUMBER 12 桁 (チェックディジット適合する公開サンプル)
+        res = c.post("/detect", json={"text": "個人番号 123456789018 です"})
+        body = res.json()
+        my_number_entities = [e for e in body["entities"] if e["type"] == "MY_NUMBER"]
+        assert len(my_number_entities) == 1
+        assert my_number_entities[0]["text"] == "<redacted>"
+
+    def test_opt_in_でも_credit_card_は_redacted(self) -> None:
+        from fuseji.server.app import create_app
+
+        c = TestClient(create_app(detect_include_surface=True))
+        # Visa test number (Luhn 適合)
+        res = c.post("/detect", json={"text": "card: 4242-4242-4242-4242"})
+        body = res.json()
+        cc_entities = [e for e in body["entities"] if e["type"] == "CREDIT_CARD"]
+        assert len(cc_entities) == 1
+        assert cc_entities[0]["text"] == "<redacted>"
+
+    def test_env_var_で_opt_in_できる(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from fuseji.server.app import create_app
+
+        monkeypatch.setenv("FUSEJI_DETECT_INCLUDE_SURFACE", "1")
+        c = TestClient(create_app())
+        res = c.post("/detect", json={"text": "メール: taro@example.com"})
+        e = res.json()["entities"][0]
+        assert e["text"] == "taro@example.com"
+
+    def test_デフォルト_OpenAPI_スキーマでも_text_は_optional(self, client: TestClient) -> None:
+        # OpenAPI で text が nullable / optional になっていること
+        res = client.get("/openapi.json")
+        schema = res.json()
+        entity_schema = schema["components"]["schemas"]["EntityModel"]
+        # text は required から除外、または nullable
+        text_prop = entity_schema["properties"]["text"]
+        required = entity_schema.get("required", [])
+        # text は required ではない、もしくは nullable=True
+        text_repr = str(text_prop.get("anyOf", text_prop.get("type", "")))
+        assert "text" not in required or "null" in text_repr
 
 
 class TestOpenAPI:
