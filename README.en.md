@@ -225,7 +225,7 @@ See [docs/design.md](docs/design.md). v0.x non-goals: prompt-injection guardrail
 
 ## Roadmap
 
-See [ROADMAP.md](ROADMAP.md) for details. Recent changes live in [CHANGELOG.md](CHANGELOG.md); design discussions in [docs/design.md](docs/design.md).
+See [ROADMAP.md](ROADMAP.md) for details. Recent changes live in [CHANGELOG.md](CHANGELOG.md); design discussions in [docs/design.md](docs/design.md); v0.2 → v0.3 upgrade steps in [MIGRATION.md](MIGRATION.md).
 
 - **v0.1** (shipped to PyPI): regex/checksum recognizers, GiNZA PERSON, Placeholder/Redact/Hash, Vault, Langfuse adapter, FastAPI server, CI
 - **v0.2** (dev complete, next release): expanded Recognizer protocol, security hardening, perf improvements, quality

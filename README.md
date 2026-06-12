@@ -238,7 +238,7 @@ fuseji は **検出・破棄するが保持しない（detect, never retain）**
 
 ## ロードマップ
 
-詳細は [ROADMAP.md](ROADMAP.md) を参照してください。直近の変更履歴は [CHANGELOG.md](CHANGELOG.md)、設計討議は [docs/design.md §10](docs/design.md) にあります。
+詳細は [ROADMAP.md](ROADMAP.md) を参照してください。直近の変更履歴は [CHANGELOG.md](CHANGELOG.md)、設計討議は [docs/design.md §10](docs/design.md)、v0.2 → v0.3 のアップグレード手順は [MIGRATION.md](MIGRATION.md) にあります。
 
 - **v0.1**（PyPI 公開済み）: 正規表現/checksum 認識器、GiNZA PERSON、Placeholder/Redact/Hash 戦略、Vault、Langfuse SDK アダプタ、FastAPI サーバー、CI
 - **v0.2**（開発完了、次リリース予定）: Recognizer プロトコル拡張、セキュリティ強化、性能改善、品質向上
