@@ -1,0 +1,3 @@
+fuseji[presidio]>=0.1.0
+# spaCy ja モデルは presidio-analyzer が language="ja" を要求する時のみ必要
+# python -m spacy download ja_core_news_sm を別途実行する
