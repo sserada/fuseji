@@ -102,11 +102,16 @@ class TestCorporateNumberRecognizer:
     def test_空文字列(self) -> None:
         assert list(CorporateNumberRecognizer().analyze("")) == []
 
-    def test_複数の法人番号(self) -> None:
-        text = "親会社 7000012050002、子会社 5010001030003"  # 後者も Luhn 通過するわけではなく
-        entities = list(CorporateNumberRecognizer().analyze(text))
-        # 2 件検出（片方は score 0.5 でも検出される）
+    def test_複数の法人番号_score_も明示検証(self) -> None:
+        # 7000012050002 はチェックディジット適合 → 0.95
+        # 5010001030003 は不適合 → recall 優先で 0.5 (#179)
+        text = "親会社 7000012050002、子会社 5010001030003"
+        entities = sorted(CorporateNumberRecognizer().analyze(text), key=lambda e: e.start)
         assert len(entities) == 2
+        assert entities[0].text == "7000012050002"
+        assert entities[0].score == 0.95
+        assert entities[1].text == "5010001030003"
+        assert entities[1].score == 0.5
 
     def test_デフォルト認識器セットには含まれない(self) -> None:
         # public information のため opt-in 設計
