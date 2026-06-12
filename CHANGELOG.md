@@ -29,6 +29,13 @@
 
 ### Added
 
+- `fuseji.integrations.presidio` で Presidio EntityRecognizer アダプタを追加（#147、`[presidio]` extra）:
+  - `register_fuseji_recognizers(analyzer)` で fuseji 認識器を Presidio `AnalyzerEngine` に一括登録
+  - `fuseji_to_presidio_recognizer(recognizer)` で個別アダプタを構築
+  - 日本語専用 entity type は `JP_*` 接頭辞で Presidio 名前空間衝突を回避（`MY_NUMBER` → `JP_MY_NUMBER` 等）
+  - 汎用 type (`EMAIL` → `EMAIL_ADDRESS`, `CREDIT_CARD` → `CREDIT_CARD`) は Presidio 既定名と整合
+  - `docs/integrations/presidio.md` と `examples/presidio/` を新設
+  - `pyproject.toml` に `[presidio]` extra (presidio-analyzer>=2.2.0) を追加
 - README / README.en / `docs/design.md` の比較表に汎用 LLM ベース redactor を追加（#146、docs）:
   - `OpenAI Privacy Filter` / `GLiNER2-PII` を比較表に追記（モデルサイズ / 推論コスト列を新設）
   - 「fuseji vs 汎用 LLM redactor の使い分け」短文セクションを追加（低レイテンシ・ゼロ依存・番号法 fail-closed の差別化を明示、将来の `recognizers=` アダプタ案にも言及）

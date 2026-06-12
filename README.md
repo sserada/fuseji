@@ -151,6 +151,20 @@ langfuse = Langfuse(mask=make_mask_fn())
 
 例外時は **fail-closed** で `[fuseji: masking failed]` を返し、原データは絶対に通しません。
 
+## Presidio 統合（`[presidio]` extra）
+
+Microsoft Presidio から fuseji の日本語特化認識器を呼べます。
+
+```python
+from presidio_analyzer import AnalyzerEngine
+from fuseji.integrations.presidio import register_fuseji_recognizers
+
+analyzer = AnalyzerEngine(supported_languages=["ja"])  # ja の NLP engine を別途設定
+register_fuseji_recognizers(analyzer)  # fuseji 認識器を一括登録
+```
+
+日本語専用 type は `JP_*` 接頭辞で Presidio 名前空間衝突を回避（`MY_NUMBER` → `JP_MY_NUMBER` 等）。詳細は [`docs/integrations/presidio.md`](docs/integrations/presidio.md)。
+
 ## サーバーモード（Langfuse 取り込みコールバック / OTel サイドカー）
 
 ```bash

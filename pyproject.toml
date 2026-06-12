@@ -45,8 +45,12 @@ server = [
 faker = [
     "Faker>=24.0",
 ]
+presidio = [
+    # Presidio EntityRecognizer アダプタ (#147)
+    "presidio-analyzer>=2.2.0",
+]
 all = [
-    "fuseji[ginza,server,faker]",
+    "fuseji[ginza,server,faker,presidio]",
 ]
 
 [project.urls]
