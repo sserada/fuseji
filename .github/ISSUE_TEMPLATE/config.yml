@@ -1,2 +1,21 @@
 blank_issues_enabled: true
-contact_links: []
+
+# Issue 作成画面に表示される追加導線 (#206).
+# Issue tracker をバグ報告 / 機能要望に集中させ、質問・議論・脆弱性報告は
+# それぞれ適切な窓口に誘導する。
+contact_links:
+  - name: 質問・議論 / Questions & Discussions
+    url: https://github.com/sserada/fuseji/discussions
+    about: 使い方の質問、議論、機能アイデアのブレインストーミングは GitHub Discussions で。
+
+  - name: セキュリティ脆弱性の非公開報告 / Security advisory (private)
+    url: https://github.com/sserada/fuseji/security/advisories/new
+    about: 脆弱性は公開 Issue ではなく Security Advisory 経由で報告してください。
+
+  - name: セキュリティポリシー / Security policy
+    url: https://github.com/sserada/fuseji/blob/main/SECURITY.md
+    about: 報告 SLA、対応プロセス、設計上の安全保証、既知の脅威モデルは SECURITY.md を参照。
+
+  - name: サポート窓口一覧 / Support channels
+    url: https://github.com/sserada/fuseji/blob/main/SUPPORT.md
+    about: 用途別の窓口・Issue を立てるときに含めると助かる情報は SUPPORT.md を参照。
