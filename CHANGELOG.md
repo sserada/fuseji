@@ -7,6 +7,12 @@
 
 ### Added
 
+- `CorporateNumberRecognizer`（法人番号、`CORPORATE_NUMBER`）を追加（#126）:
+  - 国税庁公開仕様の 13 桁チェックディジット検証
+  - `MY_NUMBER` と同じく recall 優先（不一致でも score 0.5 で残す）
+  - 公開情報のため `default_recognizers()` には含めず opt-in
+  - `Masker(recognizers=[*default_recognizers(), CorporateNumberRecognizer()])` で明示組み込み
+  - `entity_types.CORPORATE_NUMBER` 定数追加
 - `Vault` プロトコルに `assign_many(pairs)` を追加（#97）:
   - `(type, surface)` のシーケンスに対し一括で placeholder を割り当てる API
   - `InMemoryVault` 実装は 1 回の lock 取得で全件処理し、`VaultStrategy.mask` で k 回の lock contention を 1 回に縮約

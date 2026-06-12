@@ -335,6 +335,18 @@ normalize("０９０ー１２３４")    # "090-1234"
 - `JpPhoneRecognizer`（`entity_type="JP_PHONE_NUMBER"`、numbering plan）
 - `JpPostalRecognizer`（`entity_type="JP_POSTAL_CODE"`、〒 と文脈ブースト）
 
+### Opt-in 認識器（default_recognizers() に含まれない）
+
+- `CorporateNumberRecognizer`（`entity_type="CORPORATE_NUMBER"`、score=0.95/0.5、13 桁、国税庁公開仕様のチェックディジット、#126）。公開情報のため強い検出ニーズは利用者次第。明示的に組み込む:
+
+```python
+from fuseji import Masker
+from fuseji.recognizers.base import default_recognizers
+from fuseji.recognizers.corporate_number import CorporateNumberRecognizer
+
+masker = Masker(recognizers=[*default_recognizers(), CorporateNumberRecognizer()])
+```
+
 ---
 
 ## NER バックエンド
