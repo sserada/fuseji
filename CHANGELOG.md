@@ -27,6 +27,11 @@
   - 動作確認済み: `gen_ai.prompt` の PII が `<EMAIL_1>` 等に置換されてコンソール export
   - 既存 `otel-collector-config.yaml` は属性削除のフォールバック例として保持、SDK
     統合を推奨経路として README を再構成
+- `JpAddressRecognizer` の住所 regex に worst-case バックトラック対策（#141、security/perf）:
+  - `_CITY_PATTERN` を `{1,20}` の bounded quantifier 化（実在市区町村名は最長級でも 10 文字程度）
+  - attacker-controlled な長大漢字列（例: `'東京都' + '亜' * 16384`）に対する worst-case 線形性を担保
+  - bench (`tests/bench/bench_v03_recognizers.py::test_jp_address_pathological`) と
+    レイテンシ回帰テスト (`tests/test_latency_regression.py::TestJpAddressPathologicalLatency`) を追加
 - `JpAddressRecognizer` の後続テキスト greedy 取り込みを抑制（#140、bug fix）:
   - place_name パターンを「番地（数字）が後続する場合のみ消費」に変更
   - 「東京都町田市無関係な続きテキスト」のように番地のない文で後続漢字を呑み込む問題を解消

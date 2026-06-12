@@ -78,7 +78,9 @@ _PREFECTURES: tuple[str, ...] = (
 _PREF_ALT = "|".join(sorted(_PREFECTURES, key=len, reverse=True))
 
 # 市区町村パターン: 漢字・ひらがな・カタカナの連続 + 市/区/町/村/郡 で終わる
-_CITY_PATTERN = r"[一-鿿぀-ゟ゠-ヿ々ヶ]+(?:市|区|町|村|郡)"
+# bounded quantifier {1,20} で attacker-controlled な長大文字列でも worst-case 線形 (#141)。
+# 実在する日本の市区町村名はすべて 10 文字以下（最長級でも『さいたま市岩槻区』レベル）。
+_CITY_PATTERN = r"[一-鿿぀-ゟ゠-ヿ々ヶ]{1,20}(?:市|区|町|村|郡)"
 
 # 市区町村の後の地名（町名 / 字 など）: 漢字・かな・カタカナの連続。
 # bounded quantifier {0,20} で後続テキストを greedy に呑み込む暴走を防ぐ (#140)。

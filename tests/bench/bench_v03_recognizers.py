@@ -39,3 +39,22 @@ def test_v03_recognizer_per_kb(benchmark: Any, name: str, recognizer: Any, kb: i
     text = _sample_text_with_v03(kb)
     benchmark.group = f"v03_recognizer_{kb}KB"
     benchmark(lambda: list(recognizer.analyze(text)))
+
+
+def _pathological_address_text(kb: int) -> str:
+    """市区町村サフィックスを含まない pathological 入力 (#141).
+
+    都道府県 anchor + マッチ失敗を誘発する長大漢字列。bounded quantifier 化
+    前は 1 マッチ試行ごとに greedy 消費 → 1 文字ずつ縮めて再判定する経路があり、
+    O(n²) 級になりうる。
+    """
+    return "東京都" + "亜" * (kb * 1024)
+
+
+@pytest.mark.parametrize("kb", [1, 4, 16])
+def test_jp_address_pathological(benchmark: Any, kb: int) -> None:
+    """worst-case 入力でも線形時間で完了することの回帰防止 (#141)."""
+    recognizer = JpAddressRecognizer()
+    text = _pathological_address_text(kb)
+    benchmark.group = f"jp_address_pathological_{kb}KB"
+    benchmark(lambda: list(recognizer.analyze(text)))

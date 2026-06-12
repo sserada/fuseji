@@ -72,6 +72,34 @@ class TestMaskerLatency:
         assert avg < 0.020, f"4KB が遅い: {avg * 1000:.2f}ms (target < 20ms)"
 
 
+class TestJpAddressPathologicalLatency:
+    """JpAddressRecognizer の worst-case 入力に対する線形性回帰防止 (#141).
+
+    都道府県 anchor + マッチ失敗を誘発する長大漢字列。bounded quantifier 化
+    前は 1 マッチ試行ごとに greedy 消費 → 1 文字ずつ縮めて再判定する経路があり、
+    O(n²) 級になる可能性があった。
+    """
+
+    def _pathological(self, kb: int) -> str:
+        return "東京都" + "亜" * (kb * 1024)
+
+    def test_pathological_4KB_は_50ms_未満(self) -> None:
+        from fuseji.recognizers.jp_address import JpAddressRecognizer
+
+        recognizer = JpAddressRecognizer()
+        text = self._pathological(4)
+        avg = _measure(lambda: list(recognizer.analyze(text)), iterations=10)
+        assert avg < 0.050, f"4KB pathological が遅い: {avg * 1000:.2f}ms (target < 50ms)"
+
+    def test_pathological_16KB_は_200ms_未満(self) -> None:
+        from fuseji.recognizers.jp_address import JpAddressRecognizer
+
+        recognizer = JpAddressRecognizer()
+        text = self._pathological(16)
+        avg = _measure(lambda: list(recognizer.analyze(text)), iterations=5)
+        assert avg < 0.200, f"16KB pathological が遅い: {avg * 1000:.2f}ms (target < 200ms)"
+
+
 class TestVaultRestoreLatency:
     def test_vault_restore_は_m1000_でも_10ms_未満(self) -> None:
         """1000 placeholders 登録された Vault に対し restore が 10ms 未満。
