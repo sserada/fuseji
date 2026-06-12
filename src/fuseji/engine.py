@@ -223,8 +223,11 @@ def _resolve_overlaps(entities: Sequence[Entity]) -> list[Entity]:
         # 重なる可能性あり: 線形スキャンで競合を確認
         if any(not (e.end <= s or e.start >= ee) for s, ee in spans):
             continue
+        # このパスに到達した時点で必ず e.end < max_end_so_far が成立する
+        # （max_end_so_far に等しい end を持つ採用済み span を span_m=(s_m, max_end_so_far)
+        # とすると、e.start < max_end_so_far より「e.start >= span_m.end」は不成立。
+        # よって overlap-check 通過には「e.end <= s_m < max_end_so_far」が必要となる）。
+        # max_end_so_far の更新は不要。
         accepted.append(e)
         spans.append((e.start, e.end))
-        if e.end > max_end_so_far:
-            max_end_so_far = e.end
     return sorted(accepted, key=lambda e: e.start)
