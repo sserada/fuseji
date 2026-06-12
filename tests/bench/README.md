@@ -19,7 +19,8 @@ uv run pytest tests/bench/ --benchmark-only -v
 - `bench_vault.py`: `InMemoryVault.restore` のスケール曲線
 - `bench_resolve_overlaps.py`: `_resolve_overlaps` の entity 数スケール曲線（#98）
 - `bench_mask_json.py`: `Masker.mask_json` の leaf 数 / ネスト深度スケール（#98）
-- `bench_strategies.py`: Placeholder / Redact / Hash / VaultStrategy の横並び比較（#98）
+- `bench_strategies.py`: Placeholder / Redact / Hash / VaultStrategy の横並び比較。`[faker]` extra があれば FakerStrategy も計測（#98 / #128）
+- `bench_v03_recognizers.py`: v0.3 opt-in 認識器 (`CORPORATE_NUMBER` / `JP_ADDRESS`) のスケール曲線
 
 ## レイテンシ目標（design_docs §2 より）
 

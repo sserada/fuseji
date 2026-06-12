@@ -92,3 +92,25 @@ def test_masker_with_vault(benchmark: Any) -> None:
     text = "メール taro@example.com 連絡先 090-1234-5678 〒123-4567"
     benchmark.group = "masker_with_vault"
     benchmark(masker.mask, text)
+
+
+# FakerStrategy ベンチ (#128, `[faker]` extra 必須).
+# Faker 未インストール環境では skip。
+pytest_faker = pytest.importorskip("faker", reason="Faker required for #128 bench")
+
+
+def test_faker_strategy(benchmark: Any, text_and_entities: tuple[str, list[Entity]]) -> None:
+    """FakerStrategy（deterministic キャッシュあり、再呼び出しで cache hit）.
+
+    100 PII で初回計算後に、同 surface 集合で繰り返し呼ぶことで決定的モードの
+    cache hit 性能を計測する。Hash 戦略の cache=True と並ぶ「キャッシュあり」
+    パターンの 1 つ。
+    """
+    from fuseji.faker_strategy import FakerStrategy
+
+    text, entities = text_and_entities
+    benchmark.group = "strategies_100pii"
+    strategy = FakerStrategy(salt="bench")
+    # 初回キャッシュ充填（測定対象は cache hit パス）
+    strategy.mask(text, entities)
+    benchmark(strategy.mask, text, entities)
