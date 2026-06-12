@@ -16,15 +16,25 @@ LLM observability platforms (Langfuse, LangSmith, Phoenix, OTel-based stacks) pr
 
 For Japanese text, existing solutions fail structurally:
 
-| Tool | Japanese | My Number | JP phone |
-| --- | --- | --- | --- |
-| Presidio | ✗ (no recognizers shipped) | ✗ | ✗ (incidental matches only) |
-| LLM Guard | ✗ (English BERT) | ✗ | ✗ |
-| GLiNER PII | ✗ (six European langs) | ✗ | ✗ |
-| OTel Collector | ✗ (regex only) | ✗ | ✗ |
-| **fuseji** | **✓** | **✓** (Number Act compliant) | **✓** |
+| Tool | Japanese | My Number | JP phone | Model size | Inference cost |
+| --- | --- | --- | --- | --- | --- |
+| Presidio | ✗ (no recognizers shipped) | ✗ | ✗ (incidental matches only) | regex + optional NER | ms |
+| LLM Guard | ✗ (English BERT) | ✗ | ✗ | hundreds-of-MB BERT | tens of ms |
+| GLiNER PII | ✗ (six European langs) | ✗ | ✗ | 0.2B | tens of ms |
+| OpenAI Privacy Filter | △ (English-centric) | ✗ | ✗ | 1.5B-class (MoE, ~50M active) | GPU-bound |
+| GLiNER2-PII | △ (multilingual, no JP-specific tuning) | ✗ | ✗ | 0.3B | CPU OK |
+| OTel Collector | ✗ (regex only) | ✗ | ✗ | regex only | ms |
+| **fuseji** | **✓** | **✓** (Number Act compliant) | **✓** | regex + optional NER | μs–ms |
 
 fuseji addresses Japanese-specific challenges: no whitespace word boundaries, large-to-small address ordering, full/half-width digit and hyphen variation, name-vs-common-noun ambiguity, and the 12-digit My Number structure.
+
+### When to use fuseji vs general-purpose LLM-based redactors
+
+Recent general-purpose PII redactors such as `OpenAI Privacy Filter` and `GLiNER2-PII` target different design goals from fuseji. They are complementary rather than competitive.
+
+- **Use fuseji when**: you need μs–ms inline latency in an LLM observability path; no GPU available (sidecar / Edge / Lambda deployment); fail-closed handling for Japan-specific entities (My Number, corporate number, JP address); zero-dependency deployment is important.
+- **Use a general-purpose LLM redactor when**: you need recall for unanticipated PII in free-form multilingual text; GPU budget is available; the workload is English-centric internal documents.
+- **Future composition**: We are evaluating `GLiNER2` / `Privacy Filter` as adapters plugged into fuseji's `recognizers=` interface (as an additional NER backend for higher recall). Presidio interop is tracked in [`fuseji.integrations.presidio`](https://github.com/sserada/fuseji/issues/147).
 
 ## Entity coverage
 

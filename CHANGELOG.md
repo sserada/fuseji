@@ -29,6 +29,10 @@
 
 ### Added
 
+- README / README.en / `docs/design.md` の比較表に汎用 LLM ベース redactor を追加（#146、docs）:
+  - `OpenAI Privacy Filter` / `GLiNER2-PII` を比較表に追記（モデルサイズ / 推論コスト列を新設）
+  - 「fuseji vs 汎用 LLM redactor の使い分け」短文セクションを追加（低レイテンシ・ゼロ依存・番号法 fail-closed の差別化を明示、将来の `recognizers=` アダプタ案にも言及）
+  - `docs/design.md` §1 にも併記
 - `FakerStrategy` の mapping を opt-in に変更（#139、security fix）:
   - `keep_mapping: bool = False` を追加。デフォルトで `MaskResult.mapping` を空 dict
   - v0.3 初期版で `fake → 原 PII` を mapping に保存していたが「detect, never retain」原則と矛盾していた経路を遮断
