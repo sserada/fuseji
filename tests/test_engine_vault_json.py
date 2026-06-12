@@ -215,6 +215,22 @@ class TestMaskJson:
         # キーが 2 つ残ること（情報が失われない）
         assert len(result) == 2
 
+    def test_dict_キーの_masked_text_が完全一致したら___N_サフィックス(self) -> None:
+        # 異なる surface の mask() 結果が完全に同じになるケースで、
+        # サフィックスによる一意化パスを通す。Placeholder 戦略は call ごとに
+        # 番号を 1 から振るため、同じ entity_type の単独キー 2 つは両方 `<EMAIL_1>`
+        # にマスクされる。
+        m = Masker(mask_dict_keys=True)
+        result = m.mask_json({"a@b.com": "v1", "c@d.com": "v2"})
+        # 2 件とも保存される（衝突回避による）
+        assert len(result) == 2
+        keys = list(result.keys())
+        # 1 つは <EMAIL_1>、もう 1 つは <EMAIL_1>__2 のサフィックス付き
+        assert "<EMAIL_1>" in keys
+        assert "<EMAIL_1>__2" in keys
+        # 値が両方残る
+        assert set(result.values()) == {"v1", "v2"}
+
     def test_mask_dict_keys_True_でも非_str_キーは素通し(self) -> None:
         # int / tuple など str 以外のキーはマスクできないので素通し
         m = Masker(mask_dict_keys=True)
