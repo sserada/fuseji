@@ -14,15 +14,25 @@
 
 LLM オブザーバビリティ基盤（Langfuse、LangSmith、Phoenix、OTel）はトレース送信前に PII を伏せるためのマスキングフックを提供しています。しかし、既存の参照実装はすべて英語圏向けで、日本語テキストでは構造的に取りこぼします。
 
-| ツール | 日本語対応 | マイナンバー | 日本の電話番号 |
-| --- | --- | --- | --- |
-| Presidio | ✗（recognizer 未提供） | ✗ | ✗（他ロケールの偶発一致のみ） |
-| LLM Guard | ✗（英語 BERT 前提） | ✗ | ✗ |
-| GLiNER PII | ✗（欧州 6 言語） | ✗ | ✗ |
-| OTel Collector | ✗（regex のみ） | ✗ | ✗ |
-| **fuseji** | **✓** | **✓**（番号法対応） | **✓** |
+| ツール | 日本語対応 | マイナンバー | 日本の電話番号 | モデルサイズ | 推論コスト |
+| --- | --- | --- | --- | --- | --- |
+| Presidio | ✗（recognizer 未提供） | ✗ | ✗（他ロケールの偶発一致のみ） | regex + 任意 NER | ms |
+| LLM Guard | ✗（英語 BERT 前提） | ✗ | ✗ | 数百MB BERT | 数十ms |
+| GLiNER PII | ✗（欧州 6 言語） | ✗ | ✗ | 0.2B | 数十ms |
+| OpenAI Privacy Filter | △（英語中心） | ✗ | ✗ | 1.5B 規模（活性 50M 級 MoE） | GPU 推論前提 |
+| GLiNER2-PII | △（多言語、日本語特化なし） | ✗ | ✗ | 0.3B | CPU 推論可 |
+| OTel Collector | ✗（regex のみ） | ✗ | ✗ | regex のみ | ms |
+| **fuseji** | **✓** | **✓**（番号法対応） | **✓** | regex + 任意 NER | μs〜ms |
 
 日本語固有の課題（語境界がない、住所が大→小の順序、全角/半角混在、人名と一般名詞の曖昧性、マイナンバーの 12 桁構造）に正面から対応します。
+
+### 汎用 LLM ベース PII redactor との使い分け
+
+近年、`OpenAI Privacy Filter` や `GLiNER2-PII` のような汎用 PII redactor が登場しています。fuseji とは設計目標が異なり、補完的に併用できます。
+
+- **fuseji を選ぶ場面**: LLM オブザーバビリティのインライン経路で μs〜ms オーダーのレイテンシ予算しか取れない、GPU を持たないサイドカー / Edge / Lambda、マイナンバー / 法人番号 / 日本の住所など fail-closed が必要な番号法対応エンティティ、依存ゼロでデプロイしたい
+- **汎用 LLM redactor を選ぶ場面**: 多言語の自由記述から想定外の PII を recall したい、GPU リソースに余裕がある、英語中心の社内ドキュメントを扱う
+- **将来の併用**: fuseji の `recognizers=` インタフェースに `GLiNER2` / `Privacy Filter` をアダプタとして組み込む案を検討中（recall 向上の追加バックエンドとして）。Presidio との相互運用は [`fuseji.integrations.presidio`](https://github.com/sserada/fuseji/issues/147) で検討中
 
 ## 対応エンティティ
 
