@@ -114,3 +114,23 @@ def test_faker_strategy(benchmark: Any, text_and_entities: tuple[str, list[Entit
     # 初回キャッシュ充填（測定対象は cache hit パス）
     strategy.mask(text, entities)
     benchmark(strategy.mask, text, entities)
+
+
+def test_faker_strategy_cache_miss(benchmark: Any) -> None:
+    """FakerStrategy 全 cache miss path (#142 回帰防止).
+
+    各ラウンドで新しい strategy と新しい unique surface 集合を投入することで、
+    `_fake_for` の cache hit 経路を踏まずに Faker インスタンス再構築コストを
+    計測する。`_build_faker` でインスタンスを使い回す最適化 (#142) の効果が
+    出ているか確認できる。
+    """
+    from fuseji.faker_strategy import FakerStrategy
+
+    text, entities = _build_text_and_entities(100)
+    benchmark.group = "strategies_100pii_cache_miss"
+
+    def run() -> None:
+        # 毎ラウンド新規 strategy → _faker_holder が空 → Faker() 構築コストを含む
+        FakerStrategy(salt="bench").mask(text, entities)
+
+    benchmark(run)

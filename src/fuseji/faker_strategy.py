@@ -96,6 +96,10 @@ class FakerStrategy:
     deterministic: bool = True
     keep_mapping: bool = False
     _faker_cache: dict[str, str] = field(default_factory=dict, init=False, repr=False)
+    # Faker インスタンスを strategy あたり 1 個だけ持つ lazy holder (#142)。
+    # locale プロバイダのロードは数 ms 〜十数 ms かかるため、surface ごとに
+    # `Faker(self.locale)` を作り直さず seed_instance で seed のみ差し替える。
+    _faker_holder: list[Faker] = field(default_factory=list, init=False, repr=False)
 
     def __post_init__(self) -> None:
         try:
@@ -110,9 +114,13 @@ class FakerStrategy:
             raise InvalidConfigError("salt は空文字列にできません")
 
     def _build_faker(self, surface: str) -> Faker:
-        from faker import Faker
+        # Faker(self.locale) は数 ms 〜十数 ms かかるため strategy 毎に 1 回だけ構築 (#142)。
+        # seed_instance は軽量（provider rebuild なし）なので surface ごとに seed のみ差し替える。
+        if not self._faker_holder:
+            from faker import Faker
 
-        fake = Faker(self.locale)
+            self._faker_holder.append(Faker(self.locale))
+        fake = self._faker_holder[0]
         if self.deterministic:
             # 同一 surface → 同一 Faker seed
             seed = int(hashlib.sha256(f"{self.salt}:{surface}".encode()).hexdigest()[:16], 16)
