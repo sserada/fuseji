@@ -162,10 +162,10 @@ masker = Masker(recognizers=[*default_recognizers(), EmployeeIdRecognizer()])
 ### 5.4 仮名化バウルト（optional）
 
 ```python
-vault = InMemoryVault()                       # 8 文字 hex nonce を自動生成
+vault = InMemoryVault()                       # 128-bit (32 文字 hex) nonce を自動生成 (#185)
 masker = Masker(vault=vault)
 r = masker.mask("田中さんと佐藤さん")
-# -> <PERSON_1_a3f9b2c4>さんと<PERSON_2_a3f9b2c4>さん
+# -> <PERSON_1_a3f9b2c4e5d6f7a8b9c0d1e2f3a4b5c6>さんと<PERSON_2_a3f9b2c4e5d6f7a8b9c0d1e2f3a4b5c6>さん
 restored = vault.restore(llm_response)        # 自分の nonce を含む placeholder のみ復元
 ```
 

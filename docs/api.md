@@ -236,7 +236,7 @@ class InMemoryVault:
 ```
 
 - 同一 `(type, surface)` には常に同一 placeholder を返す
-- placeholder 形式は `<TYPE_N_nonce>`（type ごとに 1 から付番、末尾にインスタンス固有 8 文字 nonce）。`nonce` は `secrets.token_hex(4)` で自動生成され、テスト用途では `InMemoryVault(nonce="...")` で明示指定可能。別 Vault 由来の placeholder 形式は `restore` で構造的に素通し → クロステナント漏洩防止 (#81)
+- placeholder 形式は `<TYPE_N_nonce>`（type ごとに 1 から付番、末尾にインスタンス固有 32 文字 nonce）。`nonce` は `secrets.token_hex(16)` (128-bit) で自動生成され (#185)、テスト用途では `InMemoryVault(nonce="...")` で明示指定可能。別 Vault 由来の placeholder 形式は `restore` で構造的に素通し → クロステナント漏洩防止 (#81)
 - `excluded_types` に含まれる type は `assign` で `None` を返し対応表に残さない
 - デフォルトは `{"MY_NUMBER", "CREDIT_CARD"}`:
   - `MY_NUMBER` は番号法対応で復元を許さない
