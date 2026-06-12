@@ -1,2 +1,2 @@
-fuseji[otel]>=0.2.0
+fuseji[otel]>=0.1.0
 opentelemetry-sdk>=1.20
