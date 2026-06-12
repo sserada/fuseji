@@ -46,4 +46,11 @@ curl http://localhost:8000/healthz
 ## ポイント
 
 - fuseji-server には検出ロジックは含まれない（Masker に委譲）。本番運用では fuseji の dev タグではなく特定 version イメージを固定すること
-- 高 RPS では FastAPI を gunicorn + uvicorn workers の構成で多重化し、ボディサイズ・タイムアウト制限（Issue #29 で追加予定）を必ず有効化
+- 高 RPS では FastAPI を gunicorn + uvicorn workers の構成で多重化し、運用上の上限値（body size / timeout / API キー認証 / CORS、いずれも v0.2 で実装済み）を必ず有効化:
+
+  ```bash
+  export FUSEJI_SERVER_MAX_BODY_BYTES=1000000   # 1MB（default）
+  export FUSEJI_SERVER_TIMEOUT_SECONDS=30       # 30 秒（default）
+  export FUSEJI_API_KEY=...                     # X-API-Key ヘッダで認証
+  export FUSEJI_CORS_ORIGINS=https://langfuse.your-host.example
+  ```
