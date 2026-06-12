@@ -37,12 +37,16 @@ LLM オブザーバビリティ基盤（Langfuse、LangSmith、Phoenix、OTel）
 | `CREDIT_CARD` | 正規表現 + Luhn 検証 | ロケール非依存 |
 | `PERSON` | NER（GiNZA backend、`[ginza]` extra） | CPU で ~100ms / ~100 tokens |
 
-### v0.2 以降
+### v0.3（実装済み）
 
-- `JP_ADDRESS`（正規化ベースの住所検出）
-- `CORPORATE_NUMBER`（法人番号、opt-in）
+- `JP_ADDRESS`（47 都道府県 + 市区町村 + 番地、minimum viable regex、opt-in）
+- `CORPORATE_NUMBER`（法人番号 13 桁、国税庁公開仕様 checksum、opt-in）
+
+### v0.4 以降（候補）
+
 - `BANK_ACCOUNT_JP`、`DRIVERS_LICENSE_JP`
 - NER バックエンド比較（GiNZA / BERT-NER / GLiNER-ja）
+- `JP_ADDRESS` の高精度版（jageocoder / normalize-japanese-addresses 系を評価）
 
 ## インストール
 
@@ -195,7 +199,7 @@ fuseji は **検出・破棄するが保持しない（detect, never retain）**
 
 - **v0.1**（PyPI 公開済み）: 正規表現/checksum 認識器、GiNZA PERSON、Placeholder/Redact/Hash 戦略、Vault、Langfuse SDK アダプタ、FastAPI サーバー、CI
 - **v0.2**（開発完了、次リリース予定）: Recognizer プロトコル拡張（`name` + `regex_analyze` ファクトリ）、セキュリティ強化（Vault placeholder nonce / Hash mapping opt-in / CC を Vault excluded / API キー認証 + CORS / chunked-body pure ASGI / mask_json dict key opt-in）、性能改善（`normalize` 1 回化 / `assign_many` bulk / `_resolve_overlaps` 早期採用 / Hash LRU opt-in）、Issue/PR 駆動の品質向上（doctest+coverage gate / Unicode テスト網羅 / クロス認識器テスト / bench 拡充）
-- **v0.3**（候補）: 認識器追加（`JP_ADDRESS` / 法人番号）、Faker 戦略、ingestion callback の Docker イメージ、OTel example
+- **v0.3**（実装済み、リリース予定）: `JP_ADDRESS` / `CORPORATE_NUMBER` 認識器（opt-in）、`FakerStrategy`（`[faker]` extra）、OTel SDK 統合 example、Docker イメージ更新
 - **v0.4 以降**（候補）: NER バックエンド比較（BERT-NER / GLiNER-ja fine-tune）、構造化フィールド対応、batch API、true sweep-line `_resolve_overlaps`
 
 ## コントリビューション
