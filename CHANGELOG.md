@@ -29,6 +29,11 @@
 
 ### Added
 
+- `FakerStrategy._faker_cache` に `max_cache_size` を導入 (LRU 退避)（#177、perf）:
+  - `max_cache_size: int = 8192` を新規追加。Hash 戦略の `lru_cache(maxsize=8192)` と整合
+  - 上限超過時は最古アクセスのエントリを `OrderedDict.popitem(last=False)` で破棄
+  - 高カードナリティ surface が継続流入する長時間稼働でメモリ消費が bounded のまま保たれる
+  - `max_cache_size=0` で従来の無制限挙動を選択可能 (後方互換)
 - FastAPI lifespan で Masker をウォームアップ（#173、perf）:
   - `create_app()` 内に `@asynccontextmanager async def lifespan` を組み込み、startup 時にダミー入力で `actual_masker.mask(...)` を 1 回流す
   - 認識器の正規表現コンパイル・任意 NER backend (GiNZA / Faker 等) のロードを startup フェーズで済ませ、初回 `/mask` `/detect` リクエストのコールドスタート p99 スパイクを回避

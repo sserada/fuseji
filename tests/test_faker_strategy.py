@@ -205,6 +205,58 @@ class TestSaltDefaultRandomized:
         assert "<redacted>" in repr(s)
 
 
+class TestCacheBounded:
+    """#177: _faker_cache の max_cache_size LRU 削除."""
+
+    def test_デフォルト_max_cache_size_は_8192(self) -> None:
+        s = FakerStrategy()
+        assert s.max_cache_size == 8192
+
+    def test_上限超過で_最古エントリが_LRU_で_捨てられる(self) -> None:
+        s = FakerStrategy(max_cache_size=3)
+        # 3 件まで充填
+        s._fake_for("PERSON", "alpha")
+        s._fake_for("PERSON", "beta")
+        s._fake_for("PERSON", "gamma")
+        assert len(s._faker_cache) == 3
+        # 4 件目投入 → 最古 (alpha) が捨てられる
+        s._fake_for("PERSON", "delta")
+        assert len(s._faker_cache) == 3
+        assert "PERSON:alpha" not in s._faker_cache
+        assert "PERSON:delta" in s._faker_cache
+
+    def test_hit_すると_LRU_順で_末尾に_動く(self) -> None:
+        # alpha → beta → gamma の順に投入後、alpha を hit させると alpha が
+        # 末尾に動き、次の追加 (delta) で beta が削除される (alpha は生存)。
+        s = FakerStrategy(max_cache_size=3)
+        s._fake_for("PERSON", "alpha")
+        s._fake_for("PERSON", "beta")
+        s._fake_for("PERSON", "gamma")
+        # alpha を再 hit
+        s._fake_for("PERSON", "alpha")
+        # delta 追加 → beta (最古) が削除される
+        s._fake_for("PERSON", "delta")
+        assert "PERSON:beta" not in s._faker_cache
+        assert "PERSON:alpha" in s._faker_cache
+        assert "PERSON:gamma" in s._faker_cache
+        assert "PERSON:delta" in s._faker_cache
+
+    def test_max_cache_size_0_は_無制限(self) -> None:
+        s = FakerStrategy(max_cache_size=0)
+        for i in range(100):
+            s._fake_for("PERSON", f"surface_{i}")
+        # 100 件すべて生存
+        assert len(s._faker_cache) == 100
+
+    def test_deterministic_False_でも_例外なし(self) -> None:
+        # deterministic=False では cache を経由しないため max_cache_size の影響なし
+        s = FakerStrategy(deterministic=False, max_cache_size=3)
+        for i in range(10):
+            s._fake_for("PERSON", f"surface_{i}")
+        # cache に追加されない
+        assert len(s._faker_cache) == 0
+
+
 class TestFakerInstanceReuse:
     """#142 — Faker インスタンスは strategy あたり 1 回だけ構築されること."""
 
