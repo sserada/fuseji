@@ -76,6 +76,7 @@ dev = [
     "pytest>=8.0",
     "pytest-cov>=5.0",
     "pytest-benchmark>=4.0",
+    "pytest-randomly>=3.15",  # テスト順序依存・hash 順依存の検知 (#169)
     "ruff>=0.6",
     "mypy>=1.10",
 ]
