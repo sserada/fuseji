@@ -164,6 +164,32 @@ class TestOpenAPI:
         assert res.json()["info"]["version"] == __version__
 
 
+class TestLifespanWarmup:
+    """#173: FastAPI lifespan で Masker をウォームアップ."""
+
+    def test_TestClient_with_経由で_lifespan_が_実行される(self) -> None:
+        # TestClient(app) はデフォルトで lifespan を起動する (httpx の挙動)。
+        # ウォームアップ中に例外が出ないこと、ヘルスチェックが lifespan 完了後に
+        # 200 を返すことを検証する。
+        from fuseji.server.app import create_app
+
+        with TestClient(create_app()) as c:
+            res = c.get("/healthz")
+            assert res.status_code == 200
+
+    def test_warmup_後に_最初の_mask_が_失敗しない(self) -> None:
+        # lifespan 内で actual_masker.mask("warmup ...") を 1 回呼ぶため、
+        # 認識器コンパイル等の初期化が startup 時に完了している。
+        # ここでは「lifespan 内で例外が出るとリクエストが受け付けられなくなる」
+        # 経路の回帰防止として、最初の /mask が即座に 200 を返すことを確認。
+        from fuseji.server.app import create_app
+
+        with TestClient(create_app()) as c:
+            res = c.post("/mask", json={"data": "first request taro@example.com"})
+            assert res.status_code == 200
+            assert "taro@example.com" not in res.json()["data"]
+
+
 class TestBodySizeLimit:
     def test_デフォルト_1MB_未満は受け付ける(self, client: TestClient) -> None:
         small = {"data": "a" * 100}

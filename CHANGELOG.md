@@ -29,6 +29,10 @@
 
 ### Added
 
+- FastAPI lifespan で Masker をウォームアップ（#173、perf）:
+  - `create_app()` 内に `@asynccontextmanager async def lifespan` を組み込み、startup 時にダミー入力で `actual_masker.mask(...)` を 1 回流す
+  - 認識器の正規表現コンパイル・任意 NER backend (GiNZA / Faker 等) のロードを startup フェーズで済ませ、初回 `/mask` `/detect` リクエストのコールドスタート p99 スパイクを回避
+  - `/healthz` は lifespan 完了後に 200 を返すため、k8s readinessProbe と組み合わせて安全
 - `fuseji.integrations.otel` で OpenTelemetry SDK 統合ヘルパを公式モジュール化（#161、`[otel]` extra）:
   - `mask_attribute(span, key, value, masker)` / `mask_attributes(span, mapping, masker, keys)` / `DEFAULT_ATTRIBUTE_KEYS` を公開
   - v0.3 で example として導入 (#129) したものを公式 API に昇格。`from fuseji.integrations.otel import mask_attribute` で利用

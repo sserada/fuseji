@@ -5,7 +5,8 @@ from __future__ import annotations
 import asyncio
 import hmac
 import os
-from collections.abc import Callable, Sequence
+from collections.abc import AsyncIterator, Callable, Sequence
+from contextlib import asynccontextmanager
 from typing import Any, TypeVar
 
 from fastapi import FastAPI, Request
@@ -384,10 +385,23 @@ def create_app(
         else _detect_include_surface_from_env()
     )
 
+    # lifespan で Masker をウォームアップ (#173)。認識器の正規表現コンパイル・
+    # 任意 NER backend のロード等を startup 時に済ませ、初回リクエストの
+    # コールドスタート (p99 レイテンシスパイク) を回避する。`/healthz` は
+    # lifespan 完了後にしか 200 を返さないため、k8s readinessProbe と組み合わせ
+    # ても安全。
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        # 実 PII を含まないダミー入力でフルパイプを 1 回走らせる。
+        # mask_json も同パイプを通るが、テキスト経路だけウォームアップで十分。
+        actual_masker.mask("warmup taro@example.com 090-0000-0000")
+        yield
+
     new_app = FastAPI(
         title="fuseji",
         description="日本語特化の PII 検出・マスキングミドルウェア",
         version=__version__,
+        lifespan=lifespan,
     )
     # ミドルウェアは登録順の逆順で外側に被さる。最外周から順に:
     # CORS（プリフライト処理）→ timeout → body-size → auth → アプリ
