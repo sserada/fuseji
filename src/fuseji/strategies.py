@@ -119,18 +119,18 @@ class VaultStrategy:
         # ユニーク化した (type, surface) を 1 回の assign_many で一括採番し、
         # k 回の lock 取得を 1 回に縮約する（#97）。同一 surface の重複は
         # mapping の整合性を保つため事前に除去する。
-        seen: dict[tuple[str, str], int] = {}
+        seen: set[tuple[str, str]] = set()
         unique_pairs: list[tuple[str, str]] = []
         for e in entities:
             key = (e.type, e.text)
             if key not in seen:
-                seen[key] = len(unique_pairs)
+                seen.add(key)
                 unique_pairs.append(key)
         assigned = self.vault.assign_many(unique_pairs)
         # (type, surface) → placeholder（excluded type のときは None）
-        ph_by_key: dict[tuple[str, str], str | None] = {
-            unique_pairs[i]: assigned[i] for i in range(len(unique_pairs))
-        }
+        ph_by_key: dict[tuple[str, str], str | None] = dict(
+            zip(unique_pairs, assigned, strict=True)
+        )
         replacements: list[tuple[int, int, str]] = []
         mapping: dict[str, str] = {}
         for e in entities:

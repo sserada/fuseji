@@ -173,9 +173,10 @@ fuseji は **検出・破棄するが保持しない（detect, never retain）**
 
 ## ロードマップ
 
-- **v0.1**（現行）: 正規表現/checksum 認識器、GiNZA PERSON、Placeholder/Redact/Hash 戦略、Vault、Langfuse SDK アダプタ、FastAPI サーバー、CI
-- **v0.2**: `JP_ADDRESS`、ingestion callback の Docker イメージ、OTel example、Faker 戦略、fuseji-bench
-- **v0.3**: NER バックエンド比較（BERT-NER / GLiNER-ja fine-tune）、構造化フィールド対応、batch API
+- **v0.1**（PyPI 公開済み）: 正規表現/checksum 認識器、GiNZA PERSON、Placeholder/Redact/Hash 戦略、Vault、Langfuse SDK アダプタ、FastAPI サーバー、CI
+- **v0.2**（開発完了、次リリース予定）: Recognizer プロトコル拡張（`name` + `regex_analyze` ファクトリ）、セキュリティ強化（Vault placeholder nonce / Hash mapping opt-in / CC を Vault excluded / API キー認証 + CORS / chunked-body pure ASGI / mask_json dict key opt-in）、性能改善（`normalize` 1 回化 / `assign_many` bulk / `_resolve_overlaps` 早期採用 / Hash LRU opt-in）、Issue/PR 駆動の品質向上（doctest+coverage gate / Unicode テスト網羅 / クロス認識器テスト / bench 拡充）
+- **v0.3**（候補）: 認識器追加（`JP_ADDRESS` / 法人番号）、Faker 戦略、ingestion callback の Docker イメージ、OTel example
+- **v0.4 以降**（候補）: NER バックエンド比較（BERT-NER / GLiNER-ja fine-tune）、構造化フィールド対応、batch API、true sweep-line `_resolve_overlaps`
 
 ## コントリビューション
 
