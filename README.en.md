@@ -39,12 +39,16 @@ fuseji addresses Japanese-specific challenges: no whitespace word boundaries, la
 | `CREDIT_CARD` | Regex + Luhn | Locale-independent |
 | `PERSON` | NER (GiNZA backend, `[ginza]` extra) | CPU: ~100ms / ~100 tokens |
 
-### v0.2+
+### v0.3 (shipped)
 
-- `JP_ADDRESS` (normalization-first detection)
-- `CORPORATE_NUMBER` (opt-in)
+- `JP_ADDRESS` (47 prefectures + ward + banchi regex, minimum viable, opt-in)
+- `CORPORATE_NUMBER` (13-digit, official checksum, opt-in)
+
+### v0.4+ (candidate)
+
 - `BANK_ACCOUNT_JP`, `DRIVERS_LICENSE_JP`
 - NER backend comparison (GiNZA vs BERT-NER vs GLiNER-ja)
+- High-precision `JP_ADDRESS` (jageocoder / normalize-japanese-addresses)
 
 ## Installation
 
@@ -184,7 +188,7 @@ See [docs/design.md](docs/design.md). v0.x non-goals: prompt-injection guardrail
 
 - **v0.1** (shipped to PyPI): regex/checksum recognizers, GiNZA PERSON, Placeholder/Redact/Hash, Vault, Langfuse adapter, FastAPI server, CI
 - **v0.2** (dev complete, next release): expanded Recognizer protocol (`name` + `regex_analyze` factory), security hardening (Vault placeholder nonce / Hash mapping opt-in / CC excluded by default / API-key auth + CORS / pure-ASGI chunked-body limit / opt-in mask_json dict-key masking), perf improvements (one-shot `normalize` / `assign_many` bulk / `_resolve_overlaps` early-exit / opt-in Hash LRU), quality (doctest + 90% coverage gate / Unicode coverage / cross-recognizer regression / bench expansion)
-- **v0.3** (candidate): more recognizers (`JP_ADDRESS`, corporate number), Faker strategy, Docker image for ingestion callback, OTel example
+- **v0.3** (shipped, next release): `JP_ADDRESS` / `CORPORATE_NUMBER` recognizers (opt-in), `FakerStrategy` (`[faker]` extra), OTel SDK integration example, Docker image refresh
 - **v0.4+** (candidate): NER backend comparison (BERT-NER / GLiNER-ja fine-tune), structured-field-aware masking, batch API, true sweep-line `_resolve_overlaps`
 
 ## Contributing

@@ -6,7 +6,7 @@
 | --- | --- |
 | [`langfuse_sdk/`](langfuse_sdk/) | Langfuse SDK の `mask=` パラメータに fuseji を差し込む最短サンプル |
 | [`langfuse_ingestion_callback/`](langfuse_ingestion_callback/) | Langfuse self-hosted の ingestion masking callback として fuseji-server を使う |
-| [`otel/`](otel/) | OTel Collector の processors で `POST /mask` を叩く構成 |
+| [`otel/`](otel/) | OpenTelemetry SDK 統合（`mask_attribute` helper で `gen_ai.prompt` 等を set 前マスク） + OTel Collector 経由の補助構成 |
 | [`ginza/`](ginza/) | GiNZA バックエンド有効化で日本人名（PERSON）も検出 |
 
 ## 共通のセットアップ
