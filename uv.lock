@@ -539,6 +539,7 @@ all = [
     { name = "ja-ginza" },
     { name = "opentelemetry-api" },
     { name = "presidio-analyzer" },
+    { name = "starlette" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 faker = [
@@ -557,6 +558,7 @@ presidio = [
 ]
 server = [
     { name = "fastapi" },
+    { name = "starlette" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -582,6 +584,7 @@ requires-dist = [
     { name = "ja-ginza", marker = "extra == 'ginza'", specifier = ">=5.2.0" },
     { name = "opentelemetry-api", marker = "extra == 'otel'", specifier = ">=1.20" },
     { name = "presidio-analyzer", marker = "extra == 'presidio'", specifier = ">=2.2.0" },
+    { name = "starlette", marker = "extra == 'server'", specifier = ">=0.40,<2.0" },
     { name = "uvicorn", extras = ["standard"], marker = "extra == 'server'", specifier = ">=0.29" },
 ]
 provides-extras = ["ginza", "server", "faker", "presidio", "otel", "all"]
