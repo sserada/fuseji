@@ -3,7 +3,7 @@ name: 機能要望
 about: 新しい機能やエンティティタイプの追加を提案する
 title: ""
 labels: enhancement
-assignees: ""
+assignees: sserada
 ---
 
 ## 概要

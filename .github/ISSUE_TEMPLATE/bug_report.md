@@ -3,7 +3,7 @@ name: バグ報告
 about: 不具合を報告する
 title: ""
 labels: bug
-assignees: ""
+assignees: sserada
 ---
 
 ## 現象
@@ -38,4 +38,4 @@ masker = Masker()
 - fuseji バージョン:
 - Python バージョン:
 - OS:
-- extras（ginza, server 等）:
+- extras（ginza / server / faker / presidio / otel など）:
