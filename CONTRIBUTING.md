@@ -48,7 +48,7 @@ class Recognizer(Protocol):
     name: str         # 認識器の識別子（snake_case）。Entity.recognizer に格納
     def analyze(
         self, text: str, *, normalized: str | None = None
-    ) -> Iterable[Entity]: ...
+    ) -> Iterator[Entity]: ...
 ```
 
 `normalized` は Masker 層で事前計算された `normalize(text)` の結果。正規化を

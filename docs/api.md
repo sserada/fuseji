@@ -261,7 +261,7 @@ class Recognizer(Protocol):
     name: str         # 認識器の識別子（snake_case）。`Entity.recognizer` に格納
     def analyze(
         self, text: str, *, normalized: str | None = None
-    ) -> Iterable[Entity]: ...
+    ) -> Iterator[Entity]: ...
 ```
 
 `normalized` には `Masker.detect` が 1 回だけ計算した `normalize(text)`（全角→半角の
@@ -345,7 +345,7 @@ normalize("０９０ー１２３４")    # "090-1234"
 
 ```python
 class NerBackend(Protocol):
-    def analyze(self, text: str) -> Iterable[Entity]: ...
+    def analyze(self, text: str) -> Iterator[Entity]: ...
 ```
 
 ### `GinzaBackend`
