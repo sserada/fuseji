@@ -80,7 +80,24 @@ mask_fn("...")  # 例外時は "[fuseji: masking failed]"
 
 `MY_NUMBER` 認識器は **recall 優先** で、チェックディジット不一致でも `score=0.5` で検出します。デフォルト `threshold=0.4` のため、これらもマスク対象となります。これは番号法上「漏らさない」ことを最優先する設計です。
 
-#### 7. `/detect` レスポンスのデフォルト redact (#143)
+#### 7. `Entity` / `MaskResult` の `__repr__` は PII safe (#144)
+
+`Entity` と `MaskResult` の `repr()` は原 PII surface を含みません。
+
+```python
+from fuseji import Masker
+result = Masker().mask("マイナンバー: 123456789018")
+repr(result)
+# 'MaskResult(text=<len=20>, entities=<count=1>, mapping=<count=0>)'
+repr(result.entities[0])
+# "Entity(type='MY_NUMBER', text=<len=12 hash=07228476>, start=8, end=20, score=0.95, recognizer='my_number')"
+```
+
+`text` フィールドは `<len=N hash=XXXXXXXX>` 形式の安全要約に置換されます（`hash` は SHA256 prefix 8 文字）。`logger.info('%s', entity)` / pytest assert 失敗時の dump / FastAPI 500 traceback / LangChain Callback の自動ログで原 PII が偶発的に刻まれる経路を遮断します。
+
+デバッグで原 surface が必要な場合は明示的に `entity.unsafe_repr()` を呼びます（opt-in、呼び出し元が PII 露出責任を負う）。CWE-209 / CWE-532 / OWASP ASVS V7.1.1 への対応。
+
+#### 8. `/detect` レスポンスのデフォルト redact (#143)
 
 FastAPI サーバーの `POST /detect` はデフォルトで `entities[].text` を `null` として返します。原 PII surface（メール / 電話 / マイナンバー疑い等）はサーバー → クライアント間のネットワーク・ログ集約・APM・ブラウザ devtools すべてに刻まれません。クライアントは原テキストを自身で保持しているため、`type` / `start` / `end` / `score` / `recognizer` のオフセット情報のみで再構築できます。
 
@@ -94,17 +111,17 @@ app = create_app(detect_include_surface=True)
 
 または環境変数 `FUSEJI_DETECT_INCLUDE_SURFACE=1`。opt-in 時も `MY_NUMBER` / `CREDIT_CARD` / `CORPORATE_NUMBER` は `<redacted>` 固定で返り、原値が API 上で露出することはありません。OWASP LLM02:2025 / CWE-200 への対応。
 
-#### 8. DoS / リソース消費の防止
+#### 9. DoS / リソース消費の防止
 
 - **`mask_json` の再帰深度上限**: デフォルト 100 段。超過した場合は fail-closed で `"[fuseji: too deep]"` に置換され、原データは返らない。スタック溢れや無限再帰由来の DoS を抑止する（`Masker(max_json_depth=...)` で調整可能）
 - **FastAPI サーバーのボディサイズ上限**: デフォルト 1MB。Content-Length が超過する要求は 413 で拒否する。環境変数 `FUSEJI_SERVER_MAX_BODY_BYTES` で上書き可能
 - **`InMemoryVault.clear()`**: 長時間稼働中のメモリ無制限増加を防ぐため、明示的にクリアできる
 
-#### 9. Thread-safety と並行運用
+#### 10. Thread-safety と並行運用
 
 `InMemoryVault.assign` は内部 `threading.Lock` で保護されており、Uvicorn の thread pool で並行に呼ばれてもカウンタ採番衝突や同一 (type, surface) への重複 placeholder 発行は起きません。`get` / `restore` は dict 読み取りのみで GIL に守られるため lock 不要です。
 
-#### 10. 例外階層
+#### 11. 例外階層
 
 fuseji 由来の例外は `FusejiError` を基底とする階層（`InvalidEntityError` / `InvalidConfigError`）に集約されています。
 
