@@ -52,6 +52,10 @@
 
 ### Changed
 
+- v0.3 認識器と FakerStrategy のベンチを追加（PR #137）:
+  - `bench_v03_recognizers.py` 新設: `CorporateNumberRecognizer` / `JpAddressRecognizer` を 1KB / 4KB で計測
+  - `bench_strategies.py` に `test_faker_strategy` 追加: cache hit パスの計測、faker 未インストール環境は skip
+  - 計測例 (M1): CORPORATE_NUMBER 1KB ~27μs / 4KB ~109μs、JP_ADDRESS 1KB ~39μs / 4KB ~157μs（線形スケール、< 1ms/KB target 内）
 - ベンチマークを 3 領域に拡充（#98）:
   - `bench_resolve_overlaps.py` を新設し、entity 数 10/100/1000 で `_resolve_overlaps` の O(n²) スケール曲線を計測（#95 sweep-line 化の前後比較に利用）
   - `bench_mask_json.py` を新設し、flat dict (100/1000 leaf) と入れ子 (3/10 段) の `mask_json` レイテンシを計測
