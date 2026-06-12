@@ -7,6 +7,13 @@
 
 ### Added
 
+- `FakerStrategy` を追加 (`[faker]` extra、#128):
+  - Faker で PII を架空値に置換する戦略。ja_JP ロケール
+  - 高センシティビティ type (`MY_NUMBER` / `CREDIT_CARD` / `CORPORATE_NUMBER`) は再検出回避のため固定マスク `<MASKED>` で置換
+  - `JP_PHONE_NUMBER` / `JP_POSTAL_CODE` は安全な fictitious format（`070-0000-XXXX` / `999-XXXX`）で再検出問題を回避
+  - `EMAIL` は `safe_email` (RFC 6761 reserved domain)
+  - 決定的モード (`deterministic=True` デフォルト): 同一 surface に同一 fake → マルチターンの context preservation
+  - `from fuseji.faker_strategy import FakerStrategy` で利用
 - `CorporateNumberRecognizer`（法人番号、`CORPORATE_NUMBER`）を追加（#126）:
   - 国税庁公開仕様の 13 桁チェックディジット検証
   - `MY_NUMBER` と同じく recall 優先（不一致でも score 0.5 で残す）

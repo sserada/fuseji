@@ -126,6 +126,36 @@ class Redact:
 
 固定文字列で置換。`mapping` は空。
 
+### `FakerStrategy`（`[faker]` extra 必須、#128）
+
+```python
+@dataclass(frozen=True)
+class FakerStrategy:
+    locale: str = "ja_JP"
+    salt: str = "fuseji-default-salt-please-override"
+    deterministic: bool = True
+```
+
+PII を架空値に置換する戦略（context preservation 重視）。
+
+- `PERSON` → Faker の `name()` (ja_JP)
+- `EMAIL` → Faker の `safe_email()` (RFC 6761 reserved domain で再検出問題なし)
+- `JP_PHONE_NUMBER` → 安全な fictitious format `070-0000-XXXX` 等
+- `JP_POSTAL_CODE` → `999-XXXX`（999 局番は実在せず）
+- `MY_NUMBER` / `CREDIT_CARD` / `CORPORATE_NUMBER` → 固定マスク `<MASKED>` で再検出回避
+- 未知の type → `<TYPE>`
+
+```python
+from fuseji import Masker
+from fuseji.faker_strategy import FakerStrategy
+
+masker = Masker(strategy=FakerStrategy(salt="my-app-salt"))
+result = masker.mask("田中さん a@b.com")
+# 例: '林 陽子さん user@example.org' のような架空値に置換
+```
+
+セキュリティ注意: `salt` を本番ではプロセス毎にランダム化することを推奨。同一 salt のままだと外部から surface→fake 写像を推測できる。
+
 ### `Hash`
 
 ```python
