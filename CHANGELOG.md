@@ -29,6 +29,11 @@
 
 ### Added
 
+- `[server]` extra に starlette のバージョン上下限を明示追加（#189、security）:
+  - 旧: starlette は fastapi の transitive dep として暗黙に引き込まれていた
+  - 新: `starlette>=0.40,<2.0` を直接ピン
+  - `>=0.40`: GHSA-2c2j-9gv5-cj73 (multipart DoS) / GHSA-93gm-qmq6-w238 (path traversal) 等の CVE 修正版以上
+  - `<2.0`: 将来の starlette 2.x の breaking change を silent に引き込まないための defensive ceiling
 - `Placeholder.mask` のループ融合と `_replace_spans` への `pre_sorted` ヒント（#187、perf）:
   - 旧: sort + numbering loop + replacements list-comp + `_replace_spans` 内 sort で 2 回 sort・2 回走査
   - 新: sort 1 回 + 単一 pass で番号付与と replacements 構築、`_replace_spans(..., pre_sorted=True)` で再 sort を skip
