@@ -149,6 +149,35 @@ langfuse = Langfuse(mask=make_mask_fn())
 
 Exceptions are handled **fail-closed**: a fixed placeholder string is returned instead of the original data — never leaking PII even on failure.
 
+## OpenTelemetry SDK integration (`[otel]` extra)
+
+```python
+from opentelemetry import trace
+from fuseji import Masker
+from fuseji.integrations.otel import mask_attribute
+
+masker = Masker()
+tracer = trace.get_tracer(__name__)
+with tracer.start_as_current_span("llm-call") as span:
+    mask_attribute(span, "gen_ai.prompt", user_prompt, masker)
+```
+
+See [`docs/integrations/otel.md`](docs/integrations/otel.md) for details.
+
+## Presidio integration (`[presidio]` extra)
+
+Call fuseji's Japanese-first recognizers from Microsoft Presidio:
+
+```python
+from presidio_analyzer import AnalyzerEngine
+from fuseji.integrations.presidio import register_fuseji_recognizers
+
+analyzer = AnalyzerEngine(supported_languages=["ja"])  # set up ja NLP engine separately
+register_fuseji_recognizers(analyzer)  # register fuseji recognizers in one call
+```
+
+Japanese-only types use a `JP_*` prefix to avoid Presidio namespace clashes (`MY_NUMBER` → `JP_MY_NUMBER`, etc.). See [`docs/integrations/presidio.md`](docs/integrations/presidio.md) for details.
+
 ## Server mode (Langfuse ingestion callback / OTel sidecar)
 
 ```bash
