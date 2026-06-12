@@ -1,21 +1,45 @@
 # Langfuse ingestion masking callback として fuseji-server を起動する最小構成
 # 実際の Langfuse self-hosted は別途立ち上げ、masking endpoint として
 # http://fuseji-server:8000/mask を設定する。
+#
+# v0.2 で追加された security middleware を環境変数で有効化:
+# - FUSEJI_API_KEY: X-API-Key ヘッダによる認証（Langfuse worker から `Authorization` ではなく
+#   `X-API-Key` ヘッダで送る設定が必要）。docker secret / .env で管理し平文を残さない
+# - FUSEJI_CORS_ORIGINS: ブラウザ経由のクロスオリジン要求を許可する場合に設定。
+#   サーバー間通信のみなら未設定（default 無効）
+# - FUSEJI_SERVER_MAX_BODY_BYTES / FUSEJI_SERVER_TIMEOUT_SECONDS: 上限値の上書き
 services:
   fuseji-server:
     image: python:3.13-slim
     container_name: fuseji-server
     working_dir: /app
+    # v0.2 で API キー認証 / CORS / chunked-body limit が追加。
+    # PyPI v0.2.0 リリース前は git+https から dev 版を install すること。
     command: >
       bash -c "
-      pip install --no-cache-dir 'fuseji[server]>=0.1.0' &&
+      pip install --no-cache-dir 'fuseji[server]>=0.2.0' &&
       uvicorn fuseji.server.app:app --host 0.0.0.0 --port 8000
       "
     ports:
       - "8000:8000"
     restart: unless-stopped
+    environment:
+      # ↓ 本番では必ず .env / docker secret などで強い値を設定する
+      FUSEJI_API_KEY: "${FUSEJI_API_KEY:-change-me-please}"
+      FUSEJI_SERVER_MAX_BODY_BYTES: "1000000"
+      FUSEJI_SERVER_TIMEOUT_SECONDS: "30"
+      # CORS は同一 docker network のサーバー間通信のため未設定（default 無効）
+      # ブラウザ経由で叩く必要があれば:
+      # FUSEJI_CORS_ORIGINS: "https://langfuse.your-host.example"
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz')"]
+      # /healthz は API キー保護対象外
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz')",
+        ]
       interval: 30s
       timeout: 5s
       retries: 3
