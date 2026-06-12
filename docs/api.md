@@ -163,6 +163,8 @@ result = masker.mask("田中さん a@b.com")
 - `__repr__` は `salt=<redacted>` で抑制し、ログ漏洩経路を遮断
 - ただし `FakerStrategy` は逆引き耐性を提供しない。暗号学的保護が必要な場合は `Hash` 戦略を使う
 
+本番運用での salt 管理 / mapping 取扱い / キャッシュ運用は [`docs/integrations/faker.md`](integrations/faker.md) を参照。
+
 ### `Hash`
 
 ```python
