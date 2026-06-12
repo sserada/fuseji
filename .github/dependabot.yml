@@ -1,0 +1,48 @@
+version: 2
+
+# Dependabot 設定 (#199)。
+#
+# 1) GitHub Actions: PR #167 で SHA pin した actions の version bump を週次で。
+#    security advisory は schedule に関わらず即 PR される (Dependabot のデフォルト)。
+# 2) Python deps: pyproject.toml の direct deps (fastapi / uvicorn / Faker /
+#    opentelemetry-api / presidio-analyzer / starlette 等) を週次で bump。
+#    uv-managed プロジェクトでも pip ecosystem として動作する。uv.lock の
+#    再生成は CI 側で行う想定 (今は手動)。
+#
+# groups で関連 update をまとめ、`open-pull-requests-limit` で PR 数を抑止。
+
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Asia/Tokyo"
+    groups:
+      actions:
+        patterns:
+          - "*"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "build(ci)"
+    labels:
+      - "ci"
+      - "security"
+
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Asia/Tokyo"
+    groups:
+      python-deps:
+        patterns:
+          - "*"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "build(deps)"
+    labels:
+      - "ci"
