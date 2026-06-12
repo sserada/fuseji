@@ -139,6 +139,8 @@ result = masker.mask("田中さん a@b.com")
 # MY_NUMBER / CREDIT_CARD / CORPORATE_NUMBER は固定マスク <MASKED>
 ```
 
+salt 管理 / mapping 取扱い / キャッシュ運用 / 逆引き耐性については [`docs/integrations/faker.md`](docs/integrations/faker.md) を参照。
+
 ## Langfuse SDK 連携
 
 ```python
