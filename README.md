@@ -151,6 +151,21 @@ langfuse = Langfuse(mask=make_mask_fn())
 
 例外時は **fail-closed** で `[fuseji: masking failed]` を返し、原データは絶対に通しません。
 
+## OpenTelemetry SDK 統合（`[otel]` extra）
+
+```python
+from opentelemetry import trace
+from fuseji import Masker
+from fuseji.integrations.otel import mask_attribute
+
+masker = Masker()
+tracer = trace.get_tracer(__name__)
+with tracer.start_as_current_span("llm-call") as span:
+    mask_attribute(span, "gen_ai.prompt", user_prompt, masker)
+```
+
+詳細は [`docs/integrations/otel.md`](docs/integrations/otel.md)。
+
 ## Presidio 統合（`[presidio]` extra）
 
 Microsoft Presidio から fuseji の日本語特化認識器を呼べます。

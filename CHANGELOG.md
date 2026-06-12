@@ -29,6 +29,12 @@
 
 ### Added
 
+- `fuseji.integrations.otel` で OpenTelemetry SDK 統合ヘルパを公式モジュール化（#161、`[otel]` extra）:
+  - `mask_attribute(span, key, value, masker)` / `mask_attributes(span, mapping, masker, keys)` / `DEFAULT_ATTRIBUTE_KEYS` を公開
+  - v0.3 で example として導入 (#129) したものを公式 API に昇格。`from fuseji.integrations.otel import mask_attribute` で利用
+  - `examples/otel/main.py` を新モジュール経由に切り替え、`examples/otel/mask_processor.py` は薄い再エクスポート互換層として残置
+  - `docs/integrations/otel.md` を新設
+  - `pyproject.toml` に `[otel]` extra (opentelemetry-api>=1.20) を追加
 - `fuseji.integrations.presidio` で Presidio EntityRecognizer アダプタを追加（#147、`[presidio]` extra）:
   - `register_fuseji_recognizers(analyzer)` で fuseji 認識器を Presidio `AnalyzerEngine` に一括登録
   - `fuseji_to_presidio_recognizer(recognizer)` で個別アダプタを構築
