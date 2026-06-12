@@ -80,18 +80,22 @@ _PREF_ALT = "|".join(sorted(_PREFECTURES, key=len, reverse=True))
 # 市区町村パターン: 漢字・ひらがな・カタカナの連続 + 市/区/町/村/郡 で終わる
 _CITY_PATTERN = r"[一-鿿぀-ゟ゠-ヿ々ヶ]+(?:市|区|町|村|郡)"
 
-# 市区町村の後の地名（町名 / 字 など）: 漢字・かな・カタカナの連続
-# 番地（数字）を含まないことで「番地が来たら止める」境界を作る
-_PLACE_NAME_PATTERN = r"[一-鿿぀-ゟ゠-ヿ々ヶ]*"
+# 市区町村の後の地名（町名 / 字 など）: 漢字・かな・カタカナの連続。
+# bounded quantifier {0,20} で後続テキストを greedy に呑み込む暴走を防ぐ (#140)。
+# 実在する日本の町名で 20 文字を超えるものは稀（最長級でも 10 文字程度）。
+_PLACE_NAME_PATTERN = r"[一-鿿぀-ゟ゠-ヿ々ヶ]{0,20}"
 
 # 番地パターン: 数字（区切り `-`）+ 任意の「番」「番地」「号」「丁目」サフィックス
 # 全角ハイフン類は normalize で `-` に統一済みの前提
 _BANCHI_PATTERN = r"\d+(?:-\d+){0,3}(?:番地?|号|丁目)?"
 
-# 全体パターン: 都道府県 + 市区町村 + 地名(漢字/かな、任意) + 番地(数字、任意)
-# 地名と番地を独立させることで「住所...です」の「です」を greedy に呑み込む問題を回避
+# 全体パターン: 都道府県 + 市区町村 + (地名 + 番地) の組をオプション化 (#140)。
+# 地名 (place_name) を単独で許すと、後続の漢字テキスト (例: '無関係な続き') を
+# greedy に呑み込んでしまうため、「番地が後ろに来る場合のみ地名も取る」境界に変更。
+# - pref + city のみマッチ → score 0.5（番地なし）
+# - pref + city + (place_name + banchi) → score 0.7 / 0.9（context boost あり）
 _ADDRESS_PATTERN = re.compile(
-    rf"(?:{_PREF_ALT}){_CITY_PATTERN}{_PLACE_NAME_PATTERN}(?:{_BANCHI_PATTERN})?"
+    rf"(?:{_PREF_ALT}){_CITY_PATTERN}(?:{_PLACE_NAME_PATTERN}{_BANCHI_PATTERN})?"
 )
 
 # コンテキスト語: 周辺にあれば address らしさが増す（postal code 認識器と同方針）
