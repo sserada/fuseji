@@ -20,7 +20,6 @@ python main.py
 
 from __future__ import annotations
 
-from mask_processor import mask_attribute
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import (
@@ -29,6 +28,7 @@ from opentelemetry.sdk.trace.export import (
 )
 
 from fuseji import Masker
+from fuseji.integrations.otel import mask_attribute
 
 
 def main() -> None:
