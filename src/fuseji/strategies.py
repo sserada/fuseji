@@ -1,4 +1,8 @@
-"""マスキング戦略 — MaskStrategy プロトコルと Placeholder / Redact / Hash / VaultStrategy 実装."""
+"""マスキング戦略 — MaskStrategy プロトコルと Placeholder / Redact / Hash / VaultStrategy 実装.
+
+`FakerStrategy` は Faker 依存を分離するため別ファイル `fuseji.faker_strategy` に
+独立して定義されている（`[faker]` extra 必須）。
+"""
 
 from __future__ import annotations
 
