@@ -94,7 +94,8 @@ class TestFakerStrategyBasics:
 class TestDeterminism:
     def test_同一_surface_には同一架空値_default(self) -> None:
         # deterministic=True (default): 同じ surface → 同じ fake
-        strategy = FakerStrategy(salt="t")
+        # mapping の確認は keep_mapping=True 経由で
+        strategy = FakerStrategy(salt="t", keep_mapping=True)
         entities = [
             _entity("PERSON", "田中太郎", 0, 4),
             _entity("PERSON", "田中太郎", 10, 14),
@@ -105,13 +106,36 @@ class TestDeterminism:
         assert len(mapping) == 1
 
     def test_異なる_surface_には異なる架空値(self) -> None:
-        strategy = FakerStrategy(salt="t")
+        strategy = FakerStrategy(salt="t", keep_mapping=True)
         entities = [
             _entity("PERSON", "田中", 0, 2),
             _entity("PERSON", "佐藤", 5, 7),
         ]
         _, mapping = strategy.mask("田中 と 佐藤", entities)
         assert len(mapping) == 2
+
+    def test_デフォルトは_mapping_に_PII_を残さない_security(self) -> None:
+        # #139: デフォルト keep_mapping=False で原 PII が mapping に漏れないこと
+        strategy = FakerStrategy(salt="t")
+        entities = [
+            _entity("EMAIL", "taro@example.co.jp", 0, 18),
+            _entity("JP_PHONE_NUMBER", "090-1234-5678", 19, 32),
+        ]
+        text = "taro@example.co.jp、090-1234-5678"
+        _, mapping = strategy.mask(text, entities)
+        # 原 PII は一切残らない
+        assert mapping == {}
+        for v in mapping.values():
+            assert "taro" not in v
+            assert "1234-5678" not in v
+
+    def test_keep_mapping_True_を明示すれば_fake_to_原_PII_を返す(self) -> None:
+        strategy = FakerStrategy(salt="t", keep_mapping=True)
+        entities = [_entity("EMAIL", "taro@example.co.jp", 0, 18)]
+        _, mapping = strategy.mask("taro@example.co.jp", entities)
+        # keep_mapping=True なら従来通り mapping に保持
+        assert len(mapping) == 1
+        assert "taro@example.co.jp" in mapping.values()
 
     def test_salt_を変えると架空値も変わる(self) -> None:
         e = [_entity("PERSON", "田中", 0, 2)]

@@ -7,6 +7,10 @@
 
 ### Added
 
+- `FakerStrategy` の mapping を opt-in に変更（#139、security fix）:
+  - `keep_mapping: bool = False` を追加。デフォルトで `MaskResult.mapping` を空 dict
+  - v0.3 初期版で `fake → 原 PII` を mapping に保存していたが「detect, never retain」原則と矛盾していた経路を遮断
+  - 旧挙動が必要な場合は `FakerStrategy(keep_mapping=True)` を明示指定
 - `FakerStrategy` を追加 (`[faker]` extra、#128):
   - Faker で PII を架空値に置換する戦略。ja_JP ロケール
   - 高センシティビティ type (`MY_NUMBER` / `CREDIT_CARD` / `CORPORATE_NUMBER`) は再検出回避のため固定マスク `<MASKED>` で置換

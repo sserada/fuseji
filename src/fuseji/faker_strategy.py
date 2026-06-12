@@ -61,6 +61,10 @@ class FakerStrategy:
             デフォルトは固定値だがプロセス起動時にランダム化する運用も推奨。
         deterministic: True (デフォルト) で同一 surface に同一架空値を返す。
             False では呼び出しごとにランダムな架空値（context preservation 失効）。
+        keep_mapping: True で `MaskResult.mapping` に `{fake: 元 surface}` を残す。
+            デフォルトは **False**（mapping は空 dict）。Hash 戦略と整合させ、
+            「detect, never retain」設計原則を守る (#139)。LLM trace 等に mapping を
+            書き出すと PII が漏れるため、明示的に有効化したときのみ保持する。
 
     **再検出問題への対応**: Faker が生成する電話番号 / 郵便番号 / CC / マイナンバー /
     法人番号は fuseji の認識器が再度 PII として検出する形式になりうる。再検出を
@@ -90,6 +94,7 @@ class FakerStrategy:
     locale: str = "ja_JP"
     salt: str = "fuseji-default-salt-please-override"
     deterministic: bool = True
+    keep_mapping: bool = False
     _faker_cache: dict[str, str] = field(default_factory=dict, init=False, repr=False)
 
     def __post_init__(self) -> None:
@@ -154,9 +159,9 @@ class FakerStrategy:
         for e in entities:
             fake = self._fake_for(e.type, e.text)
             replacements.append((e.start, e.end, fake))
-            # mapping は復元用ではなく「どんな架空値に置換されたか」のトレース用。
-            # PII 漏洩を避けるためデフォルトでは empty を維持する選択肢もあるが、
-            # 戦略ごとの semantics に揺れがあるため、ここでは「fake → 元 surface」を返す
-            # （Hash の keep_mapping=False と整合させる場合は別 PR で flag 化）
-            mapping[fake] = e.text
+            # **デフォルトでは mapping を空に保つ** (#139)。Hash 戦略の keep_mapping=False
+            # と整合させ「detect, never retain」設計原則を守る。`keep_mapping=True` を
+            # 明示指定したときのみ fake → 元 surface を返す（後で復元が必要な用途向け）。
+            if self.keep_mapping:
+                mapping[fake] = e.text
         return _replace_spans(text, replacements), mapping
