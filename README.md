@@ -236,10 +236,12 @@ fuseji は **検出・破棄するが保持しない（detect, never retain）**
 
 ## ロードマップ
 
+詳細は [ROADMAP.md](ROADMAP.md) を参照してください。直近の変更履歴は [CHANGELOG.md](CHANGELOG.md)、設計討議は [docs/design.md §10](docs/design.md) にあります。
+
 - **v0.1**（PyPI 公開済み）: 正規表現/checksum 認識器、GiNZA PERSON、Placeholder/Redact/Hash 戦略、Vault、Langfuse SDK アダプタ、FastAPI サーバー、CI
-- **v0.2**（開発完了、次リリース予定）: Recognizer プロトコル拡張（`name` + `regex_analyze` ファクトリ）、セキュリティ強化（Vault placeholder nonce / Hash mapping opt-in / CC を Vault excluded / API キー認証 + CORS / chunked-body pure ASGI / mask_json dict key opt-in）、性能改善（`normalize` 1 回化 / `assign_many` bulk / `_resolve_overlaps` 早期採用 / Hash LRU opt-in）、Issue/PR 駆動の品質向上（doctest+coverage gate / Unicode テスト網羅 / クロス認識器テスト / bench 拡充）
-- **v0.3**（実装済み、リリース予定）: `JP_ADDRESS` / `CORPORATE_NUMBER` 認識器（opt-in）、`FakerStrategy`（`[faker]` extra）、OTel SDK 統合 example、Docker イメージ更新
-- **v0.4 以降**（候補）: NER バックエンド比較（BERT-NER / GLiNER-ja fine-tune）、構造化フィールド対応、batch API、true sweep-line `_resolve_overlaps`
+- **v0.2**（開発完了、次リリース予定）: Recognizer プロトコル拡張、セキュリティ強化、性能改善、品質向上
+- **v0.3**（実装中、リリース予定）: `JP_ADDRESS` / `CORPORATE_NUMBER` 認識器（opt-in）、`FakerStrategy` / `[faker]`、OTel SDK 公式統合 (`[otel]`)、Presidio 公式アダプタ (`[presidio]`)、セキュリティ強化（`/detect` redact / repr PII safe / salt ランダム化 / mapping opt-in）
+- **v0.4 以降**（候補）: NER バックエンド比較、構造化フィールド対応、batch API、true sweep-line `_resolve_overlaps`
 
 ## コントリビューション
 
