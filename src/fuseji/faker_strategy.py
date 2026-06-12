@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import hashlib
 import secrets
+from collections import OrderedDict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
@@ -85,6 +86,11 @@ class FakerStrategy:
             デフォルトは **False**（mapping は空 dict）。Hash 戦略と整合させ、
             「detect, never retain」設計原則を守る (#139)。LLM trace 等に mapping を
             書き出すと PII が漏れるため、明示的に有効化したときのみ保持する。
+        max_cache_size: `(entity_type, surface) → fake` の決定性キャッシュの上限 (#177).
+            デフォルト **8192** (Hash 戦略の `lru_cache(maxsize=8192)` と同等)。
+            上限超過時は最古アクセスのエントリを LRU で破棄する。長時間稼働で
+            高カードナリティ surface が流入してもメモリは bounded のまま保たれる。
+            `0` を渡すと無制限 (旧挙動)。
 
     **再検出問題への対応**: Faker が生成する電話番号 / 郵便番号 / CC / マイナンバー /
     法人番号は fuseji の認識器が再度 PII として検出する形式になりうる。再検出を
@@ -117,7 +123,11 @@ class FakerStrategy:
     salt: str = field(default_factory=_default_salt)
     deterministic: bool = True
     keep_mapping: bool = False
-    _faker_cache: dict[str, str] = field(default_factory=dict, init=False, repr=False)
+    # cache を bounded 化 (#177)。Hash 戦略の lru_cache(maxsize=8192) と整合させ、
+    # 高カードナリティ surface 流入でメモリが単調増加するのを防ぐ。
+    # 0 を指定すると無制限 (旧挙動)。
+    max_cache_size: int = 8192
+    _faker_cache: OrderedDict[str, str] = field(default_factory=OrderedDict, init=False, repr=False)
     # Faker インスタンスを strategy あたり 1 個だけ持つ lazy holder (#142)。
     # locale プロバイダのロードは数 ms 〜十数 ms かかるため、surface ごとに
     # `Faker(self.locale)` を作り直さず seed_instance で seed のみ差し替える。
@@ -162,6 +172,8 @@ class FakerStrategy:
         """type と surface に応じた架空値を返す（決定的モードはキャッシュ経由）."""
         cache_key = f"{entity_type}:{surface}"
         if self.deterministic and cache_key in self._faker_cache:
+            # LRU: ヒットしたエントリを末尾に動かす (#177)
+            self._faker_cache.move_to_end(cache_key)
             return self._faker_cache[cache_key]
 
         if entity_type in _FIXED_MASK_TYPES:
@@ -188,6 +200,9 @@ class FakerStrategy:
 
         if self.deterministic:
             self._faker_cache[cache_key] = value
+            # 上限超過時は最古エントリを LRU で捨てる (#177)。max_cache_size=0 は無制限。
+            if self.max_cache_size and len(self._faker_cache) > self.max_cache_size:
+                self._faker_cache.popitem(last=False)
         return value
 
     def mask(self, text: str, entities: Sequence[Entity]) -> tuple[str, Mapping[str, str]]:
