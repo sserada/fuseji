@@ -42,8 +42,11 @@ server = [
     "fastapi>=0.110",
     "uvicorn[standard]>=0.29",
 ]
+faker = [
+    "Faker>=24.0",
+]
 all = [
-    "fuseji[ginza,server]",
+    "fuseji[ginza,server,faker]",
 ]
 
 [project.urls]
