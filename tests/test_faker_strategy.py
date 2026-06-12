@@ -161,6 +161,50 @@ class TestErrorHandling:
             FakerStrategy(salt="")
 
 
+class TestSaltDefaultRandomized:
+    """#145: デフォルト salt が固定ではなく per-instance random であること."""
+
+    def test_デフォルト_salt_は_インスタンス毎に_異なる(self) -> None:
+        s1 = FakerStrategy()
+        s2 = FakerStrategy()
+        assert s1.salt != s2.salt
+
+    def test_デフォルト_salt_は_長く_十分なエントロピー(self) -> None:
+        s = FakerStrategy()
+        # secrets.token_hex(32) → 64 文字 hex (256bit)
+        assert len(s.salt) == 64
+        assert all(c in "0123456789abcdef" for c in s.salt)
+
+    def test_デフォルト_salt_は_ソース固定の旧定数とは別物(self) -> None:
+        # v0.3 のデフォルト salt 文字列が偶然返ってこないこと
+        legacy_default = "fuseji-default-salt-please-override"
+        for _ in range(10):
+            assert FakerStrategy().salt != legacy_default
+
+    def test_明示_salt_は_従来通り_cross_instance_等価性を保つ(self) -> None:
+        # マルチプロセス間の決定性が必要なときは明示的に渡す
+        s1 = FakerStrategy(salt="shared-secret")
+        s2 = FakerStrategy(salt="shared-secret")
+        v1 = s1._fake_for("PERSON", "田中")
+        v2 = s2._fake_for("PERSON", "田中")
+        assert v1 == v2
+
+    def test_デフォルト_salt_では_別インスタンス間の_fake_が_異なる(self) -> None:
+        # ランダム salt → 別インスタンスの同じ surface は別 fake
+        s1 = FakerStrategy()
+        s2 = FakerStrategy()
+        # 何度か試して衝突しないことを確認 (確率的だが 256bit salt で実質ゼロ)
+        v1 = s1._fake_for("EMAIL", "taro@example.com")
+        v2 = s2._fake_for("EMAIL", "taro@example.com")
+        assert v1 != v2
+
+    def test_repr_に_salt_が_露出しない(self) -> None:
+        # ログ漏洩経路で salt を保護 (#145)
+        s = FakerStrategy(salt="super-secret-key")
+        assert "super-secret-key" not in repr(s)
+        assert "<redacted>" in repr(s)
+
+
 class TestFakerInstanceReuse:
     """#142 — Faker インスタンスは strategy あたり 1 回だけ構築されること."""
 
