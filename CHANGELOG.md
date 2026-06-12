@@ -5,6 +5,16 @@
 
 ## [Unreleased]
 
+### v0.3 Highlights
+
+新規読者向けの要約 (詳細は下記 Breaking Changes / Added セクション参照):
+
+- **新機能**: `JP_ADDRESS` / `CORPORATE_NUMBER` opt-in 認識器 (#127 #126)、`FakerStrategy` (`[faker]` 、#128)、公式 Presidio アダプタ (`[presidio]` 、#147)、公式 OpenTelemetry SDK 統合 (`[otel]` 、#161)
+- **セキュリティ**: `/detect` のデフォルト PII redact (#143)、`Entity.__repr__` PII safe (#144)、`FakerStrategy` salt ランダム化 (#145) / mapping opt-in (#139)、`InMemoryVault` nonce 128-bit (#185)、`starlette>=0.40,<2.0` 直接ピン (#189)、GitHub Actions SHA pin (#167)
+- **品質**: Hypothesis property-based テスト (#183)、pytest-randomly (#169)、`examples/otel` スモークテスト (#171)、`CorporateNumber` score の明示 assert (#179)
+- **パフォーマンス**: FastAPI lifespan で Masker ウォームアップ (#173)、`FakerStrategy._faker_cache` の LRU bound (#177)、`FakerStrategy._build_faker` 使い回し (#142)、`Placeholder.mask` ループ融合 + `_replace_spans` `pre_sorted` (#187)、`JpAddressRecognizer` regex worst-case 対策 (#141 #140)、worst-case bench (#181)
+- **コミュニティ / ドキュメント**: `CODE_OF_CONDUCT` / `SUPPORT` / `ROADMAP` 整備 (#175)、汎用 LLM ベース redactor の比較表 (#146)、日英 README ミラー (#163)、`docs/integrations/{faker,otel,presidio}.md` 整備 (#191)
+
 ### Breaking Changes
 
 - `FakerStrategy` のデフォルト `salt` をプロセス毎ランダム化（#145、security fix）:
