@@ -5,6 +5,15 @@
 
 ## [Unreleased]
 
+### Breaking Changes
+
+- `POST /detect` レスポンスから原 PII surface をデフォルト除去（#143、security fix）:
+  - `DetectResponse.entities[].text` がデフォルトで `null` を返すよう変更（旧: 原 surface を平文で返却）
+  - 「detect, never retain」原則 / OWASP LLM02:2025 / CWE-200 への対応。クライアントは原テキストを自身で保持しているため、`type`/`start`/`end`/`score`/`recognizer` のみで再構築できる
+  - 原 surface が必要な用途は `create_app(detect_include_surface=True)` または環境変数 `FUSEJI_DETECT_INCLUDE_SURFACE=1` で opt-in
+  - opt-in 時も `MY_NUMBER` / `CREDIT_CARD` / `CORPORATE_NUMBER` は `<redacted>` 固定（番号法対応 + PCI DSS）
+  - 移行方法: クライアントが `text` フィールドに依存している場合は `detect_include_surface=True` を明示指定するか、`text` 利用箇所を削除する
+
 ### Added
 
 - `FakerStrategy` の mapping を opt-in に変更（#139、security fix）:
