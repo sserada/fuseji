@@ -27,6 +27,12 @@
   - 動作確認済み: `gen_ai.prompt` の PII が `<EMAIL_1>` 等に置換されてコンソール export
   - 既存 `otel-collector-config.yaml` は属性削除のフォールバック例として保持、SDK
     統合を推奨経路として README を再構成
+- `FakerStrategy._build_faker` で Faker インスタンスを strategy あたり 1 回だけ構築するよう変更（#142、perf）:
+  - 旧実装は `_fake_for` cache miss のたびに `Faker(self.locale)` を新規構築（locale provider ロードに数 ms〜十数 ms）
+  - インスタンスを `_faker_holder` で持ち、`seed_instance(seed)` のみ surface 毎に差し替える形に変更（seed_instance は provider rebuild なし）
+  - 100 unique surface で 43ms → 16ms（ローカル M1 計測、2.6x 改善）
+  - 決定性 / cross-instance 等価性は維持
+  - `tests/bench/bench_strategies.py::test_faker_strategy_cache_miss` で cache miss path を回帰検出
 - `JpAddressRecognizer` の住所 regex に worst-case バックトラック対策（#141、security/perf）:
   - `_CITY_PATTERN` を `{1,20}` の bounded quantifier 化（実在市区町村名は最長級でも 10 文字程度）
   - attacker-controlled な長大漢字列（例: `'東京都' + '亜' * 16384`）に対する worst-case 線形性を担保

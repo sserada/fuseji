@@ -161,6 +161,43 @@ class TestErrorHandling:
             FakerStrategy(salt="")
 
 
+class TestFakerInstanceReuse:
+    """#142 — Faker インスタンスは strategy あたり 1 回だけ構築されること."""
+
+    def test_strategy_あたり_Faker_インスタンスは_1_個だけ(self) -> None:
+        strategy = FakerStrategy(salt="t")
+        # 100 unique surface を流しても holder は 1 個
+        for i in range(100):
+            strategy._fake_for("PERSON", f"surface_{i}")
+        assert len(strategy._faker_holder) == 1
+
+    def test_インスタンス再利用しても決定性が保たれる(self) -> None:
+        # 同じ surface に同じ fake が返ること（seed_instance による seed 切替が機能）
+        strategy = FakerStrategy(salt="t")
+        # 別 surface を間に挟んでも同じ surface には同じ fake が返る
+        v1 = strategy._fake_for("PERSON", "田中太郎")
+        _ = strategy._fake_for("PERSON", "佐藤花子")
+        v2 = strategy._fake_for("PERSON", "田中太郎")
+        # cache hit 経由でも同じ
+        assert v1 == v2
+
+    def test_インスタンス再利用しても異なる_surface_には異なる_fake(self) -> None:
+        strategy = FakerStrategy(salt="t")
+        # cache を経由しない一意な surface ペア
+        v1 = strategy._fake_for("PERSON", "alpha")
+        v2 = strategy._fake_for("PERSON", "beta")
+        assert v1 != v2
+
+    def test_cross_instance_determinism_は維持される(self) -> None:
+        # 同じ salt の独立 strategy が同じ surface に同じ fake を返す
+        # （旧実装の仕様を保持）
+        s1 = FakerStrategy(salt="t")
+        s2 = FakerStrategy(salt="t")
+        v1 = s1._fake_for("PERSON", "user1")
+        v2 = s2._fake_for("PERSON", "user1")
+        assert v1 == v2
+
+
 class TestIntegrationWithMasker:
     def test_Masker_と統合してフルパイプラインで動作(self) -> None:
         m = Masker(strategy=FakerStrategy(salt="t"))
