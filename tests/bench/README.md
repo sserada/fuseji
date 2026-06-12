@@ -26,7 +26,10 @@ uv run pytest tests/bench/ --benchmark-only -v
 - 正規表現/checksum 層: < 1 ms per KB
 - NER 層: < 100 ms per ~100 tokens（GiNZA、CPU）
 
-`bench_masker.py` の `test_masker_1kb_regex_only` などで上記目標を assertion 付きで失敗させる回帰検知テスト化を予定（v0.2 中盤で）。
+回帰検知 assertion 付きのテストは `tests/test_latency_regression.py` に実装済み
+（`test_masker_1KB_は_5ms_未満` / `test_masker_4KB_は_20ms_未満` / `test_vault_restore_は_m1000_でも_10ms_未満`）。
+通常 CI ではノイズによる偽陽性を避けるためデフォルトスキップで、`CI_PERF=1` を
+設定したジョブまたはローカル検証でのみ実行される（詳細は下の「CI 信頼性」節を参照）。
 
 ## 結果比較
 
