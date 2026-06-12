@@ -31,7 +31,12 @@ class MaskStrategy(Protocol):
     def mask(self, text: str, entities: Sequence[Entity]) -> tuple[str, Mapping[str, str]]: ...
 
 
-def _replace_spans(text: str, replacements: list[tuple[int, int, str]]) -> str:
+def _replace_spans(
+    text: str,
+    replacements: list[tuple[int, int, str]],
+    *,
+    pre_sorted: bool = False,
+) -> str:
     """指定範囲を 1 パスで置換して新しい文字列を返す。
 
     `replacements` は ``(start, end, substitute)`` のリスト。範囲はオーバー
@@ -39,12 +44,19 @@ def _replace_spans(text: str, replacements: list[tuple[int, int, str]]) -> str:
 
     文字列の繰り返しスライス再構築は O(k·n) になるため、segment list で
     1 パスにまとめて O(n+k) で完結させる。
+
+    Args:
+        pre_sorted: True を渡すと start 昇順にソート済みであると仮定し、内部の
+            ``sorted()`` を skip する (#187)。caller (例: Placeholder.mask)
+            が既に sort 済み replacements を渡せる場合のみ使う。誤って未ソートを
+            渡すと出力が壊れるため defensive default は False。
     """
     if not replacements:
         return text
+    ordered = replacements if pre_sorted else sorted(replacements, key=lambda x: x[0])
     out: list[str] = []
     cursor = 0
-    for start, end, sub in sorted(replacements, key=lambda x: x[0]):
+    for start, end, sub in ordered:
         out.append(text[cursor:start])
         out.append(sub)
         cursor = end
@@ -66,18 +78,23 @@ class Placeholder:
     """
 
     def mask(self, text: str, entities: Sequence[Entity]) -> tuple[str, Mapping[str, str]]:
+        # ループ融合 (#187): start 昇順に 1 度だけ sort → 同じパスで番号付与と
+        # replacements 構築を行い、_replace_spans の再 sort も skip する。
+        # 旧版は sort + numbering loop + replacements list-comp + _replace_spans
+        # 内 sort で 2 回 sort・2 回走査だった。
+        sorted_entities = sorted(entities, key=lambda x: x.start)
         counters: dict[str, int] = {}
         # (type, surface) → placeholder の割当
         assigned: dict[tuple[str, str], str] = {}
-        # 元テキスト順で番号を振る
-        for e in sorted(entities, key=lambda x: x.start):
+        replacements: list[tuple[int, int, str]] = []
+        for e in sorted_entities:
             key = (e.type, e.text)
             if key not in assigned:
                 counters[e.type] = counters.get(e.type, 0) + 1
                 assigned[key] = f"<{e.type}_{counters[e.type]}>"
-
-        replacements = [(e.start, e.end, assigned[(e.type, e.text)]) for e in entities]
-        masked = _replace_spans(text, replacements)
+            replacements.append((e.start, e.end, assigned[key]))
+        # replacements は start 昇順で構築されているので pre_sorted=True
+        masked = _replace_spans(text, replacements, pre_sorted=True)
         mapping = {placeholder: surface for (_, surface), placeholder in assigned.items()}
         return masked, mapping
 

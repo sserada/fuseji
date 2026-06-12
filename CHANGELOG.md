@@ -29,6 +29,11 @@
 
 ### Added
 
+- `Placeholder.mask` のループ融合と `_replace_spans` への `pre_sorted` ヒント（#187、perf）:
+  - 旧: sort + numbering loop + replacements list-comp + `_replace_spans` 内 sort で 2 回 sort・2 回走査
+  - 新: sort 1 回 + 単一 pass で番号付与と replacements 構築、`_replace_spans(..., pre_sorted=True)` で再 sort を skip
+  - 100 PII で ~1.4μs 改善 (bench `test_placeholder` で観測)。出力 semantic は完全不変
+  - `_replace_spans` に `pre_sorted: bool = False` を defensive default で追加 (内部関数のため API 互換維持)
 - `InMemoryVault` の nonce を 32-bit から 128-bit に拡張（#185、security）:
   - `secrets.token_hex(4)` (8 hex chars / 32-bit、誕生日衝突 ~65k 個) → `secrets.token_hex(16)` (32 hex chars / 128-bit、衝突確率 2^-128 で実質ゼロ)
   - クロステナント・マルチ Vault 運用 (マルチテナント SaaS / 並列テスト sweep) で誤 restore リスクを構造的に塞ぐ
