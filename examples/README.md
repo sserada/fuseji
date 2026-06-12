@@ -9,6 +9,7 @@
 | [`otel/`](otel/) | OpenTelemetry SDK 統合（`mask_attribute` helper で `gen_ai.prompt` 等を set 前マスク） + OTel Collector 経由の補助構成 |
 | [`ginza/`](ginza/) | GiNZA バックエンド有効化で日本人名（PERSON）も検出 |
 | [`presidio/`](presidio/) | Microsoft Presidio `AnalyzerEngine` に fuseji 認識器を `EntityRecognizer` として登録する統合サンプル |
+| [`custom_recognizer/`](custom_recognizer/) | 自社専用 ID (社員番号 等) のカスタム `Recognizer` を実装して `Masker` に組み込む最小例 |
 
 ## 共通のセットアップ
 
