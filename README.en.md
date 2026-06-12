@@ -112,6 +112,18 @@ Masker(strategy=Hash())                              # 16-char SHA256 (v0.2 defa
 Masker(strategy=Hash(length=8, keep_mapping=True))   # v0.1-compat: 8 chars + reverse mapping
 ```
 
+With the `[faker]` extra installed, `FakerStrategy` substitutes PII with format-preserving fakes:
+
+```python
+from fuseji import Masker
+from fuseji.faker_strategy import FakerStrategy  # pip install 'fuseji[faker]'
+
+masker = Masker(strategy=FakerStrategy(salt="my-app-salt"))
+result = masker.mask("田中さん a@b.com")
+# e.g. '林 陽子さん user@example.org' — formats preserved
+# MY_NUMBER / CREDIT_CARD / CORPORATE_NUMBER fall back to <MASKED>
+```
+
 ## Langfuse SDK integration
 
 ```python
