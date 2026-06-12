@@ -60,6 +60,37 @@ class TestJpAddressNegativeCases:
         assert entities == []
 
 
+class TestJpAddressGreedyRegression:
+    """#140 の後続テキスト greedy 取り込みに対する回帰防止."""
+
+    def test_後続の無関係漢字テキストは取り込まない(self) -> None:
+        # 番地が無いので place_name 取り込みもされず、city までで切れる
+        text = "東京都町田市無関係な続きテキスト"
+        entities = list(JpAddressRecognizer().analyze(text))
+        assert len(entities) == 1
+        assert entities[0].text == "東京都町田市"
+
+    def test_市区町村のあとに非番地_かなが続く文も住所部分のみ(self) -> None:
+        text = "大阪府堺市生まれです"
+        entities = list(JpAddressRecognizer().analyze(text))
+        assert len(entities) == 1
+        assert entities[0].text == "大阪府堺市"
+
+    def test_有名町名の後の文章は取り込まない(self) -> None:
+        text = "東京都港区六本木は人気の街です"
+        entities = list(JpAddressRecognizer().analyze(text))
+        assert len(entities) == 1
+        # 番地がないので「六本木」も place_name として取り込まれない
+        assert entities[0].text == "東京都港区"
+
+    def test_番地がある場合は地名も含めてマッチ(self) -> None:
+        # 番地が後続するときだけ place_name が消費される
+        text = "神奈川県横浜市西区みなとみらい1-2-3 にあります"
+        entities = list(JpAddressRecognizer().analyze(text))
+        assert len(entities) == 1
+        assert entities[0].text == "神奈川県横浜市西区みなとみらい1-2-3"
+
+
 class TestJpAddressKnownLimitations:
     """v0.3 minimum viable 版の既知制限事項を回帰テストで固定."""
 
