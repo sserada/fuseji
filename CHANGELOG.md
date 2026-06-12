@@ -29,6 +29,11 @@
 
 ### Added
 
+- Hypothesis ベースの property-based テストを追加（#183、quality）:
+  - `tests/test_properties.py` 新設、9 件の不変条件 (invariant) をランダム生成入力で検証
+  - 対象: `normalize` (文字数維持・ASCII 恒等) / `Hash` 戦略 (決定性・出力長) / `InMemoryVault.assign` (冪等性・unique 性) / `MyNumberRecognizer` (12 桁境界) / `CorporateNumberRecognizer` (13 桁境界)
+  - example-based テストで見落としやすい boundary case を自動発掘し、shrinking で最小反例を提示
+  - `pyproject.toml` の dev グループに `hypothesis>=6.100` を追加
 - `FakerStrategy._faker_cache` に `max_cache_size` を導入 (LRU 退避)（#177、perf）:
   - `max_cache_size: int = 8192` を新規追加。Hash 戦略の `lru_cache(maxsize=8192)` と整合
   - 上限超過時は最古アクセスのエントリを `OrderedDict.popitem(last=False)` で破棄
