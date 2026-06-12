@@ -132,8 +132,9 @@ class Redact:
 @dataclass(frozen=True)
 class FakerStrategy:
     locale: str = "ja_JP"
-    salt: str = "fuseji-default-salt-please-override"
+    salt: str = field(default_factory=lambda: secrets.token_hex(32))  # per-instance ランダム (#145)
     deterministic: bool = True
+    keep_mapping: bool = False  # True で {fake: 元 surface} を返す（デフォルトは空、#139）
 ```
 
 PII を架空値に置換する戦略（context preservation 重視）。
@@ -154,7 +155,13 @@ result = masker.mask("田中さん a@b.com")
 # 例: '林 陽子さん user@example.org' のような架空値に置換
 ```
 
-セキュリティ注意: `salt` を本番ではプロセス毎にランダム化することを推奨。同一 salt のままだと外部から surface→fake 写像を推測できる。
+**セキュリティ（v0.3 以降、#139 / #145）**:
+
+- `mapping` はデフォルトで空 dict。`keep_mapping=True` を明示指定したときのみ `{fake: 元 surface}` を返す
+- 戻り値 `mapping` を経由した PII 漏洩経路を遮断する（Langfuse / OTel の trace attribute 経路を想定）。「detect, never retain」原則と整合
+- `salt` のデフォルトは `secrets.token_hex(32)` で **インスタンス毎にランダム生成** (#145)。ソース固定 salt 由来の辞書攻撃逆引きを構造的に遮断する。マルチプロセス間で同じ fake を返したい用途（永続化・分散実行）は `FakerStrategy(salt="shared-secret")` を明示的に渡す（秘密として保護すること）
+- `__repr__` は `salt=<redacted>` で抑制し、ログ漏洩経路を遮断
+- ただし `FakerStrategy` は逆引き耐性を提供しない。暗号学的保護が必要な場合は `Hash` 戦略を使う
 
 ### `Hash`
 
