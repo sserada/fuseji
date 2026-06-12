@@ -225,10 +225,12 @@ See [docs/design.md](docs/design.md). v0.x non-goals: prompt-injection guardrail
 
 ## Roadmap
 
+See [ROADMAP.md](ROADMAP.md) for details. Recent changes live in [CHANGELOG.md](CHANGELOG.md); design discussions in [docs/design.md](docs/design.md).
+
 - **v0.1** (shipped to PyPI): regex/checksum recognizers, GiNZA PERSON, Placeholder/Redact/Hash, Vault, Langfuse adapter, FastAPI server, CI
-- **v0.2** (dev complete, next release): expanded Recognizer protocol (`name` + `regex_analyze` factory), security hardening (Vault placeholder nonce / Hash mapping opt-in / CC excluded by default / API-key auth + CORS / pure-ASGI chunked-body limit / opt-in mask_json dict-key masking), perf improvements (one-shot `normalize` / `assign_many` bulk / `_resolve_overlaps` early-exit / opt-in Hash LRU), quality (doctest + 90% coverage gate / Unicode coverage / cross-recognizer regression / bench expansion)
-- **v0.3** (shipped, next release): `JP_ADDRESS` / `CORPORATE_NUMBER` recognizers (opt-in), `FakerStrategy` (`[faker]` extra), OTel SDK integration example, Docker image refresh
-- **v0.4+** (candidate): NER backend comparison (BERT-NER / GLiNER-ja fine-tune), structured-field-aware masking, batch API, true sweep-line `_resolve_overlaps`
+- **v0.2** (dev complete, next release): expanded Recognizer protocol, security hardening, perf improvements, quality
+- **v0.3** (in development): `JP_ADDRESS` / `CORPORATE_NUMBER` recognizers (opt-in), `FakerStrategy` (`[faker]`), official OTel integration (`[otel]`), official Presidio adapter (`[presidio]`), security hardening (default redact in `/detect`, PII-safe repr, randomized salt, opt-in mapping)
+- **v0.4+** (candidate): NER backend comparison, structured-field-aware masking, batch API, true sweep-line `_resolve_overlaps`
 
 ## Contributing
 
