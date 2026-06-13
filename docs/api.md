@@ -74,6 +74,28 @@ class Entity:
 - `end >= start`
 - `0.0 <= score <= 1.0`
 
+**セキュリティ（v0.3 以降、#144）**: `__repr__` は原 `text` を要約形式で隠蔽します。
+
+```python
+e = Entity(type="EMAIL", text="taro@example.com", start=0, end=16, score=1.0, recognizer="email")
+repr(e)
+# "Entity(type='EMAIL', text=<len=16 hash=fb98d44a>, start=0, end=16, score=1.0, recognizer='email')"
+```
+
+- `text=<len=N hash=XXXXXXXX>` 形式 (SHA256 prefix 8 文字) の安全要約に置換
+- `logger.info('%s', entity)` / 例外 traceback / pytest assert dump / LangChain Callback 自動ログ経由で原 PII が漏れない
+- `Entity.text` 属性参照は従来通り (API 形状は不変)
+- 同じ surface は同じ hash → debug log で 1 マッチを追跡できるが、surface 原本の復元はできない
+
+デバッグで原 text が必要な場合は **opt-in** で `unsafe_repr()` を呼びます。**ログ / traceback / 永続化に渡してはいけません**:
+
+```python
+e.unsafe_repr()
+# "Entity(type='EMAIL', text='taro@example.com', start=0, end=16, score=1.0, recognizer='email')"
+```
+
+詳細: [SECURITY.md §7](../SECURITY.md) / CHANGELOG Breaking Changes (#144)。
+
 ---
 
 ## `MaskResult`
@@ -89,6 +111,16 @@ class MaskResult:
 ```
 
 `mapping` は Vault または `Placeholder` / `Hash` 戦略が出力した placeholder → 元 surface の対応表（戦略により意味が異なる: `Placeholder` は placeholder→original、`Hash` は hash→original、`Redact` は空）。
+
+**セキュリティ（v0.3 以降、#144）**: `__repr__` は `entities` / `mapping` の中身を出さず件数だけ示します。
+
+```python
+r = MaskResult(text="<EMAIL_1>", entities=(e,), mapping={"<EMAIL_1>": "taro@example.com"})
+repr(r)
+# 'MaskResult(text=<len=9>, entities=<count=1>, mapping=<count=1>)'
+```
+
+`entities` を構成する各 `Entity` の `repr` も上記の通り PII safe 要約。`mapping` の値 (原 surface) や `text` の placeholder 文字列はトップレベル `repr` には出ません。
 
 ---
 
