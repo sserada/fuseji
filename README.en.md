@@ -138,6 +138,8 @@ result = masker.mask("田中さん a@b.com")
 # MY_NUMBER / CREDIT_CARD / CORPORATE_NUMBER fall back to <MASKED>
 ```
 
+See [`docs/integrations/faker.md`](docs/integrations/faker.md) for details on salt management, mapping handling, cache operation, and reverse-lookup resistance.
+
 ## Langfuse SDK integration
 
 ```python
