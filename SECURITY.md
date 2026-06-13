@@ -121,6 +121,8 @@ app = create_app(detect_include_surface=True)
 
 `InMemoryVault.assign` は内部 `threading.Lock` で保護されており、Uvicorn の thread pool で並行に呼ばれてもカウンタ採番衝突や同一 (type, surface) への重複 placeholder 発行は起きません。`get` / `restore` は dict 読み取りのみで GIL に守られるため lock 不要です。
 
+`FakerStrategy` は `threading.local` で per-thread Faker インスタンスを持ち (#210)、複数スレッドが同時に `seed_instance` を呼んでも決定性 (同一 surface → 同一 fake) が保たれます。`_faker_cache` は dict 単純更新のため GIL 下で安全です。
+
 #### 11. 例外階層
 
 fuseji 由来の例外は `FusejiError` を基底とする階層（`InvalidEntityError` / `InvalidConfigError`）に集約されています。

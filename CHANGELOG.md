@@ -37,6 +37,15 @@
   - opt-in 時も `MY_NUMBER` / `CREDIT_CARD` / `CORPORATE_NUMBER` は `<redacted>` 固定（番号法対応 + PCI DSS）
   - 移行方法: クライアントが `text` フィールドに依存している場合は `detect_include_surface=True` を明示指定するか、`text` 利用箇所を削除する
 
+### Fixed
+
+- `FakerStrategy._build_faker` の thread-safety 修正（#210、bug fix）:
+  - PR #151 (#142 fix) で導入した「strategy 毎に Faker を 1 個共有 + `seed_instance` で seed 差し替え」が複数スレッドからの並行呼び出しで race condition を起こし、決定性 (同一 surface → 同一 fake) が破綻する経路があった
+  - `_faker_holder: list` を `_faker_local: threading.local` に変更し、per-thread に Faker インスタンスを持たせる構造に修正
+  - lock contention 無し、スレッド数倍の初期化コストは uvicorn worker 数 (数〜数十) で許容範囲
+  - `tests/test_faker_strategy.py::TestThreadSafety` を追加し、`ThreadPoolExecutor` 8 workers × 400 calls で同一 surface が同一 fake に解決されることを assert
+  - SECURITY.md #10 (Thread-safety) に FakerStrategy の保証を追記
+
 ### Added
 
 - `[server]` extra に starlette のバージョン上下限を明示追加（#189、security）:
