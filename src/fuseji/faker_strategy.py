@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import hashlib
 import secrets
+import threading
 from collections import OrderedDict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
@@ -128,10 +129,14 @@ class FakerStrategy:
     # 0 を指定すると無制限 (旧挙動)。
     max_cache_size: int = 8192
     _faker_cache: OrderedDict[str, str] = field(default_factory=OrderedDict, init=False, repr=False)
-    # Faker インスタンスを strategy あたり 1 個だけ持つ lazy holder (#142)。
+    # Faker インスタンスを strategy あたり **スレッド毎** に持つ lazy holder (#142 / #210)。
     # locale プロバイダのロードは数 ms 〜十数 ms かかるため、surface ごとに
     # `Faker(self.locale)` を作り直さず seed_instance で seed のみ差し替える。
-    _faker_holder: list[Faker] = field(default_factory=list, init=False, repr=False)
+    # 旧実装は単一 Faker を全スレッドで共有していたが、複数スレッドが同時に
+    # `seed_instance` を呼ぶと race condition で決定性が破綻する (#210)。
+    # threading.local で per-thread instance にすることで lock contention 無しに
+    # スレッド安全性を確保する。
+    _faker_local: threading.local = field(default_factory=threading.local, init=False, repr=False)
 
     def __post_init__(self) -> None:
         try:
@@ -155,13 +160,16 @@ class FakerStrategy:
         )
 
     def _build_faker(self, surface: str) -> Faker:
-        # Faker(self.locale) は数 ms 〜十数 ms かかるため strategy 毎に 1 回だけ構築 (#142)。
-        # seed_instance は軽量（provider rebuild なし）なので surface ごとに seed のみ差し替える。
-        if not self._faker_holder:
+        # Faker(self.locale) は数 ms 〜十数 ms かかるため per-thread に 1 回だけ構築 (#142 / #210)。
+        # seed_instance は軽量 (provider rebuild なし) だが thread-safe ではないため
+        # threading.local で per-thread instance を持つ。lock contention 無し、
+        # スレッド数倍の初期化コストはあるが uvicorn worker 数 (数〜数十) で許容範囲。
+        fake = getattr(self._faker_local, "fake", None)
+        if fake is None:
             from faker import Faker
 
-            self._faker_holder.append(Faker(self.locale))
-        fake = self._faker_holder[0]
+            fake = Faker(self.locale)
+            self._faker_local.fake = fake
         if self.deterministic:
             # 同一 surface → 同一 Faker seed
             seed = int(hashlib.sha256(f"{self.salt}:{surface}".encode()).hexdigest()[:16], 16)

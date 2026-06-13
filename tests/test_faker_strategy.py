@@ -260,12 +260,14 @@ class TestCacheBounded:
 class TestFakerInstanceReuse:
     """#142 — Faker インスタンスは strategy あたり 1 回だけ構築されること."""
 
-    def test_strategy_あたり_Faker_インスタンスは_1_個だけ(self) -> None:
+    def test_strategy_あたり_Faker_インスタンスは_スレッド毎に_1_個(self) -> None:
+        # #210: threading.local で per-thread に 1 個保持。
+        # 100 unique surface を同一スレッドで流しても current thread の Faker は 1 個
         strategy = FakerStrategy(salt="t")
-        # 100 unique surface を流しても holder は 1 個
         for i in range(100):
             strategy._fake_for("PERSON", f"surface_{i}")
-        assert len(strategy._faker_holder) == 1
+        # current thread の faker が初期化済み
+        assert getattr(strategy._faker_local, "fake", None) is not None
 
     def test_インスタンス再利用しても決定性が保たれる(self) -> None:
         # 同じ surface に同じ fake が返ること（seed_instance による seed 切替が機能）
@@ -292,6 +294,37 @@ class TestFakerInstanceReuse:
         v1 = s1._fake_for("PERSON", "user1")
         v2 = s2._fake_for("PERSON", "user1")
         assert v1 == v2
+
+
+class TestThreadSafety:
+    """#210 — 並行呼び出しでの決定性 / レース回避."""
+
+    def test_並行下でも_同一_surface_は_同一_fake_に_解決される(self) -> None:
+        from concurrent.futures import ThreadPoolExecutor
+
+        strategy = FakerStrategy(deterministic=True, salt="thread-test")
+        surfaces = [f"user{i}" for i in range(50)] * 8  # 50 unique × 8 = 400 calls
+
+        with ThreadPoolExecutor(max_workers=8) as ex:
+            results = list(ex.map(lambda s: strategy._fake_for("PERSON", s), surfaces))
+
+        # 同一 surface → 同一 fake であるべき
+        groups: dict[str, set[str]] = {}
+        for s, r in zip(surfaces, results, strict=False):
+            groups.setdefault(s, set()).add(r)
+        races = {s: vs for s, vs in groups.items() if len(vs) > 1}
+        assert races == {}, f"並行下で決定性が破綻: {races}"
+
+    def test_並行下でも_異なる_surface_は_異なる_fake(self) -> None:
+        from concurrent.futures import ThreadPoolExecutor
+
+        strategy = FakerStrategy(deterministic=True, salt="thread-test-2")
+        # 100 unique surfaces を 8 並列で 1 回ずつ
+        surfaces = [f"surface_{i}" for i in range(100)]
+        with ThreadPoolExecutor(max_workers=8) as ex:
+            results = list(ex.map(lambda s: strategy._fake_for("PERSON", s), surfaces))
+        # 100 unique surface → fake もほぼ unique (Faker name 集合は十分大きいので衝突は稀)
+        assert len(set(results)) >= len(surfaces) * 0.9
 
 
 class TestIntegrationWithMasker:

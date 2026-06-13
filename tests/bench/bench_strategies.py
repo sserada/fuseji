@@ -130,7 +130,7 @@ def test_faker_strategy_cache_miss(benchmark: Any) -> None:
     benchmark.group = "strategies_100pii_cache_miss"
 
     def run() -> None:
-        # 毎ラウンド新規 strategy → _faker_holder が空 → Faker() 構築コストを含む
+        # 毎ラウンド新規 strategy → _faker_local が空 → Faker() 構築コストを含む (#210)
         FakerStrategy(salt="bench").mask(text, entities)
 
     benchmark(run)
