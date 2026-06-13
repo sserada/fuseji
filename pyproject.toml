@@ -9,7 +9,21 @@ license-files = ["LICENSE"]
 authors = [
     { name = "sserada", email = "serada.dev@gmail.com" },
 ]
-keywords = ["pii", "masking", "japanese", "llm", "observability", "langfuse", "presidio"]
+keywords = [
+    "faker",
+    "fastapi",
+    "japanese",
+    "langfuse",
+    "llm",
+    "masking",
+    "observability",
+    "opentelemetry",
+    "otel",
+    "pii",
+    "presidio",
+    "pseudonymization",
+    "redaction",
+]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Framework :: FastAPI",
