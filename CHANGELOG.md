@@ -10,7 +10,7 @@
 新規読者向けの要約 (詳細は下記 Breaking Changes / Added セクション参照):
 
 - **新機能**: `JP_ADDRESS` / `CORPORATE_NUMBER` opt-in 認識器 (#127 #126)、`FakerStrategy` (`[faker]` 、#128)、公式 Presidio アダプタ (`[presidio]` 、#147)、公式 OpenTelemetry SDK 統合 (`[otel]` 、#161)
-- **セキュリティ**: `/detect` のデフォルト PII redact (#143)、`Entity.__repr__` PII safe (#144)、`FakerStrategy` salt ランダム化 (#145) / mapping opt-in (#139)、`InMemoryVault` nonce 128-bit (#185)、`starlette>=0.40,<2.0` 直接ピン (#189)、GitHub Actions SHA pin (#167)、OTel adapter fail-closed (#222)
+- **セキュリティ**: `/detect` のデフォルト PII redact (#143)、`Entity.__repr__` PII safe (#144)、`FakerStrategy` salt ランダム化 (#145) / mapping opt-in (#139) / pickle serialization 防御 (#224)、`InMemoryVault` nonce 128-bit (#185)、`starlette>=0.40,<2.0` 直接ピン (#189)、GitHub Actions SHA pin (#167)、OTel adapter fail-closed (#222)
 - **品質**: Hypothesis property-based テスト (#183)、pytest-randomly (#169)、`examples/otel` スモークテスト (#171)、`CorporateNumber` score の明示 assert (#179)
 - **パフォーマンス**: FastAPI lifespan で Masker ウォームアップ (#173)、`FakerStrategy._faker_cache` の LRU bound (#177)、`FakerStrategy._build_faker` 使い回し (#142)、`Placeholder.mask` ループ融合 + `_replace_spans` `pre_sorted` (#187)、`JpAddressRecognizer` regex worst-case 対策 (#141 #140)、worst-case bench (#181)
 - **コミュニティ / ドキュメント**: `CODE_OF_CONDUCT` / `SUPPORT` / `ROADMAP` 整備 (#175)、汎用 LLM ベース redactor の比較表 (#146)、日英 README ミラー (#163)、`docs/integrations/{faker,otel,presidio}.md` 整備 (#191)
@@ -39,6 +39,13 @@
 
 ### Fixed
 
+- `FakerStrategy` インスタンスのシリアライズ経路で `_faker_cache` 内の PII surface 露出を遮断（#224、security）:
+  - `_faker_cache: OrderedDict[str, str]` は `(entity_type, surface) → fake` を平文 key として保持していたため、`pickle.dumps(strategy)` / `copy.deepcopy(strategy)` 経路で cache がそのままシリアライズされ、worker プロセス・pickle ファイル・shared queue に PII surface が流出する経路があった
+  - `__getstate__` / `__setstate__` を実装し、シリアライズ時に `_faker_cache` と `_faker_local` (pickle 不可な threading.local) を state から除外。復元側は空 OrderedDict と新規 `threading.local` で再初期化する
+  - 決定性 (同一 surface → 同一 fake) は salt が pickle 経由で保たれるため復元後も同一プロセス内では維持される
+  - `tests/test_faker_strategy.py::TestSerializationSafety` を 5 件追加 (pickle round-trip / pickle bytes に原 surface 出現せず / deepcopy / 復元後決定性 / repr safe 維持)
+  - SECURITY.md §11 を「FakerStrategy インスタンスのシリアライズ防御」として新設 (JP / EN 両セクション)、`vars()` / `dataclasses.asdict()` / `__dict__` 直接参照は Python セマンティクス上インターセプト不可なため「使用しないこと」を明記
+  - `src/fuseji/faker_strategy.py` の class docstring に同等の警告を追記
 - OpenTelemetry adapter (`mask_attribute` / `mask_attributes`) を fail-closed 化（#222、security）:
   - `masker.mask` が任意の例外で失敗した場合、`mask_attribute` / `mask_attributes` は固定 placeholder `"[fuseji: masking failed]"` を `set_attribute` し、原 value を span に流出させない (Langfuse adapter と方針統一)
   - PR #161 で公式モジュール化した段階では try/except が無く、例外が呼び出し元に伝播 → traceback に原 PII が刻まれる経路 (CWE-209 / CWE-532) や、SpanProcessor ループの中断リスクがあった

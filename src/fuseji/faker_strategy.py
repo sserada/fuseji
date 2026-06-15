@@ -102,6 +102,15 @@ class FakerStrategy:
     - `MY_NUMBER` / `CREDIT_CARD` / `CORPORATE_NUMBER`: 固定マスク `<MASKED>` で置換
       （番号法対応 + Luhn 通過の架空 CC 生成回避）
 
+    **シリアライズ時の注意 (#224)**: インスタンス内部の `_faker_cache` は
+    `(entity_type, surface) → fake` を平文で保持する。pickle / `copy.deepcopy`
+    経由では `__getstate__` で cache を空に落として PII の流出を防ぐが、
+    `vars(strategy)` / `dataclasses.asdict(strategy)` / `strategy.__dict__` 直接参照
+    は Python セマンティクス上インターセプトできないため **使用しないこと**。
+    デバッグ目的でフィールドを参照したい場合は `repr(strategy)` (#145 で safe 化済) を
+    使うか、コンストラクタ引数 (`locale` / `deterministic` / `keep_mapping` /
+    `max_cache_size`) を個別に参照すること。詳細は SECURITY.md §14 参照。
+
     `[faker]` extra でインストール:
     ```bash
     pip install 'fuseji[faker]'
@@ -158,6 +167,35 @@ class FakerStrategy:
             f"deterministic={self.deterministic}, "
             f"keep_mapping={self.keep_mapping})"
         )
+
+    def __getstate__(self) -> dict[str, object]:
+        """pickle / copy.deepcopy 経路で _faker_cache / _faker_local を除外する (#224).
+
+        cache は `(entity_type, surface) → fake` を平文で保持するため、シリアライズ
+        すると「detect, never retain」原則に反し、worker プロセス / pickle ファイル
+        / shared queue に PII surface が流出する。`_faker_local` は threading.local
+        インスタンスでそもそも pickle 不可。state から両 field を除外することで:
+        - PII surface 流出を遮断
+        - pickle 自体が threading.local 由来の TypeError で失敗する経路を回避
+
+        復元側 (`__setstate__`) は空 OrderedDict と新規 threading.local で初期化し
+        functionally 等価なインスタンスにする。決定性 (同一 surface → 同一 fake) は
+        salt が pickle で保たれるため復元後も同一プロセス内で維持される。
+        """
+        state = self.__dict__.copy()
+        # cache と threading.local は state に含めない (PII 流出防止 + pickle 不可回避)
+        state.pop("_faker_cache", None)
+        state.pop("_faker_local", None)
+        return state
+
+    def __setstate__(self, state: dict[str, object]) -> None:
+        """pickle 復元時のフックで _faker_cache / _faker_local を空で初期化する (#224)."""
+        # frozen dataclass のため object.__setattr__ 経由で代入する
+        for key, value in state.items():
+            object.__setattr__(self, key, value)
+        # __getstate__ で除外した field を空状態で再構築
+        object.__setattr__(self, "_faker_cache", OrderedDict())
+        object.__setattr__(self, "_faker_local", threading.local())
 
     def _build_faker(self, surface: str) -> Faker:
         # Faker(self.locale) は数 ms 〜十数 ms かかるため per-thread に 1 回だけ構築 (#142 / #210)。
