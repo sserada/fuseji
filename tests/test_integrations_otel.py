@@ -171,7 +171,10 @@ class TestFailClosed:
         span = _FakeSpan()
         with caplog.at_level("WARNING", logger="fuseji.integrations.otel"):
             mask_attribute(
-                span, "gen_ai.prompt", "secret-pii", _ExplodingMasker()  # type: ignore[arg-type]
+                span,
+                "gen_ai.prompt",
+                "secret-pii",
+                _ExplodingMasker(),  # type: ignore[arg-type]
             )
         # 例外型名はログされる
         assert any("RuntimeError" in r.getMessage() for r in caplog.records)
@@ -185,7 +188,10 @@ class TestFailClosed:
         span = _FakeSpan()
         with caplog.at_level("ERROR", logger="fuseji.integrations.otel"):
             mask_attribute(
-                span, "gen_ai.prompt", "any-value", _ExplodingMasker()  # type: ignore[arg-type]
+                span,
+                "gen_ai.prompt",
+                "any-value",
+                _ExplodingMasker(),  # type: ignore[arg-type]
             )
         # logger.exception は ERROR レベルで traceback を含む
         assert any(r.exc_info is not None for r in caplog.records)
