@@ -63,6 +63,22 @@ GenAI semantic conventions と派生命名を網羅:
 
 Langfuse / Phoenix / OpenInference / OpenLIT が採用する命名を含みます。利用者は `mask_attributes(..., keys=...)` で上書き可能。
 
+## fail-closed (#222)
+
+`Masker.mask` が任意の例外（regex catastrophic / カスタム recognizer のバグ等）で失敗した場合、`mask_attribute` / `mask_attributes` は **固定 placeholder `"[fuseji: masking failed]"`** を `set_attribute` し、原 value を span に流出させません。Langfuse adapter と方針を統一しています（`fuseji.integrations.langfuse.make_mask_fn` 参照）。
+
+`mask_attributes` は属性ごとに独立した try/except を持つため、ある属性のマスク失敗が他属性の処理を止めません。
+
+### ログ抑制とトレースバック opt-in
+
+トレースバックには原 PII を含む文字列が刻まれる可能性があるため、デフォルトでは **例外型名のみ** ログ出力します（`logger.warning`）。詳細 traceback が必要なデバッグ局面のみ環境変数を有効にしてください:
+
+```bash
+export FUSEJI_OTEL_LOG_TRACEBACK=1
+```
+
+有効化時は `logger.exception` で完全な traceback を出力します。Langfuse adapter の `FUSEJI_LANGFUSE_LOG_TRACEBACK` と方針を統一しています。
+
 ## 設計上の注意
 
 - `mask_attribute(masker=None)` は内部で新規 `Masker()` を生成しますが、毎回ゼロから作るとレイテンシ予算を浪費します。**呼び出し側で 1 つだけ作って使い回す**ことを強く推奨します

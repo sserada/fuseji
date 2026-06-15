@@ -58,18 +58,25 @@ InMemoryVault.DEFAULT_EXCLUDED_TYPES
 
 ユーザーが意図的に復元を必要とする場合は、明示的に `InMemoryVault(excluded_types=[])` を指定する必要があります（番号法上のリスクは利用者側に帰属します）。
 
-#### 4. Langfuse アダプタの fail-closed
+#### 4. Langfuse / OpenTelemetry アダプタの fail-closed
 
-`make_mask_fn()` は内部例外を捕捉して固定 placeholder `"[fuseji: masking failed]"` を返します。原データは絶対に返却しません。
+`make_mask_fn()` (Langfuse) と `mask_attribute` / `mask_attributes` (OTel、#222) は内部例外を捕捉して固定 placeholder `"[fuseji: masking failed]"` を返します。原データは絶対に返却・set しません。両アダプタとも方針を統一しています。
 
 ```python
 from fuseji.integrations.langfuse import make_mask_fn
+from fuseji.integrations.otel import mask_attribute
 
 mask_fn = make_mask_fn()
 mask_fn("...")  # 例外時は "[fuseji: masking failed]"
+
+mask_attribute(span, "gen_ai.prompt", value, masker)
+# masker.mask が例外を投げても span 属性は "[fuseji: masking failed]" になり、
+# 原 value が span / OTel Collector / traceback 経由で外部送信されない
 ```
 
-**ログ漏洩の防止**: デフォルトでは例外型名のみログに記録され、traceback は出力しません。traceback には元の PII を含む文字列が刻まれることがあるためです。デバッグ目的でフル traceback が必要な場合のみ環境変数 `FUSEJI_LANGFUSE_LOG_TRACEBACK=1` を設定してください。
+OTel の `mask_attributes` は **属性ごとに独立した try/except** を持つため、ある属性のマスク失敗が他属性の処理を止めません。
+
+**ログ漏洩の防止**: デフォルトでは例外型名のみログに記録され、traceback は出力しません。traceback には元の PII を含む文字列が刻まれることがあるためです。デバッグ目的でフル traceback が必要な場合のみ環境変数 `FUSEJI_LANGFUSE_LOG_TRACEBACK=1` / `FUSEJI_OTEL_LOG_TRACEBACK=1` を設定してください（CWE-209 / CWE-532 対応）。
 
 #### 5. 認識器の境界
 
@@ -194,7 +201,7 @@ fuseji follows **detect, never retain**:
     - `MY_NUMBER`: Japanese Number Act (番号法) compliance — fuseji must not "handle" the number in legal terms.
     - `CREDIT_CARD`: PCI DSS Requirement 3.4/3.5 alignment — Primary Account Numbers must not be stored without strong protection.
 4. **Placeholder cross-vault isolation**: `InMemoryVault` generates a 32-char hex nonce (128-bit, expanded from 32-bit in #185) per instance and embeds it in the placeholder format `<TYPE_N_nonce>`. `restore` only matches placeholders bearing its own nonce, so an attacker cannot craft `<EMAIL_1>` in their input and have it restored to data from a different tenant's vault.
-5. **Fail-closed Langfuse adapter**: `make_mask_fn()` catches all exceptions and returns the fixed placeholder `"[fuseji: masking failed]"`. Original data is never returned.
+5. **Fail-closed Langfuse / OpenTelemetry adapters**: `make_mask_fn()` (Langfuse) and `mask_attribute` / `mask_attributes` (OTel, #222) catch all exceptions and substitute the fixed placeholder `"[fuseji: masking failed]"`. Original data is never returned/set. OTel `mask_attributes` uses per-attribute try/except so that one attribute's failure does not block sibling attributes. Tracebacks are suppressed by default (only the exception type name is logged); enable `FUSEJI_LANGFUSE_LOG_TRACEBACK=1` or `FUSEJI_OTEL_LOG_TRACEBACK=1` for debugging.
 6. **ReDoS-free**: all regex patterns have bounded quantifiers; runtime is O(n) in input length.
 7. **Recall-biased detection**: `MY_NUMBER` recognizer emits matches even when the checksum fails (score 0.5), to minimize leakage risk.
 8. **`Entity` / `MaskResult` `__repr__` is PII-safe (#144)**: `repr(entity)` returns `text=<len=N hash=XXXXXXXX>` (SHA256 prefix 8 chars) instead of the raw surface, and `repr(result)` summarizes as `entities=<count=N>` / `mapping=<count=M>`. This blocks accidental PII leakage via `logger.info('%s', entity)`, pytest assertion dumps, FastAPI 500 tracebacks, and LangChain Callback auto-logging. Use `entity.unsafe_repr()` (opt-in) only when raw surfaces are required for local debugging — the caller assumes responsibility for PII exposure. Addresses CWE-209 / CWE-532 / OWASP ASVS V7.1.1.
