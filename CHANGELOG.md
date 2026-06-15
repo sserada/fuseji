@@ -10,7 +10,7 @@
 新規読者向けの要約 (詳細は下記 Breaking Changes / Added セクション参照):
 
 - **新機能**: `JP_ADDRESS` / `CORPORATE_NUMBER` opt-in 認識器 (#127 #126)、`FakerStrategy` (`[faker]` 、#128)、公式 Presidio アダプタ (`[presidio]` 、#147)、公式 OpenTelemetry SDK 統合 (`[otel]` 、#161)
-- **セキュリティ**: `/detect` のデフォルト PII redact (#143)、`Entity.__repr__` PII safe (#144)、`FakerStrategy` salt ランダム化 (#145) / mapping opt-in (#139)、`InMemoryVault` nonce 128-bit (#185)、`starlette>=0.40,<2.0` 直接ピン (#189)、GitHub Actions SHA pin (#167)
+- **セキュリティ**: `/detect` のデフォルト PII redact (#143)、`Entity.__repr__` PII safe (#144)、`FakerStrategy` salt ランダム化 (#145) / mapping opt-in (#139)、`InMemoryVault` nonce 128-bit (#185)、`starlette>=0.40,<2.0` 直接ピン (#189)、GitHub Actions SHA pin (#167)、OTel adapter fail-closed (#222)
 - **品質**: Hypothesis property-based テスト (#183)、pytest-randomly (#169)、`examples/otel` スモークテスト (#171)、`CorporateNumber` score の明示 assert (#179)
 - **パフォーマンス**: FastAPI lifespan で Masker ウォームアップ (#173)、`FakerStrategy._faker_cache` の LRU bound (#177)、`FakerStrategy._build_faker` 使い回し (#142)、`Placeholder.mask` ループ融合 + `_replace_spans` `pre_sorted` (#187)、`JpAddressRecognizer` regex worst-case 対策 (#141 #140)、worst-case bench (#181)
 - **コミュニティ / ドキュメント**: `CODE_OF_CONDUCT` / `SUPPORT` / `ROADMAP` 整備 (#175)、汎用 LLM ベース redactor の比較表 (#146)、日英 README ミラー (#163)、`docs/integrations/{faker,otel,presidio}.md` 整備 (#191)
@@ -39,6 +39,14 @@
 
 ### Fixed
 
+- OpenTelemetry adapter (`mask_attribute` / `mask_attributes`) を fail-closed 化（#222、security）:
+  - `masker.mask` が任意の例外で失敗した場合、`mask_attribute` / `mask_attributes` は固定 placeholder `"[fuseji: masking failed]"` を `set_attribute` し、原 value を span に流出させない (Langfuse adapter と方針統一)
+  - PR #161 で公式モジュール化した段階では try/except が無く、例外が呼び出し元に伝播 → traceback に原 PII が刻まれる経路 (CWE-209 / CWE-532) や、SpanProcessor ループの中断リスクがあった
+  - `mask_attributes` は **属性ごとに独立した try/except** で、1 属性のマスク失敗が他属性の処理を止めない
+  - 環境変数 `FUSEJI_OTEL_LOG_TRACEBACK=1` で詳細 traceback ログを opt-in (Langfuse の `FUSEJI_LANGFUSE_LOG_TRACEBACK` と統一)、デフォルトは例外型名のみログ
+  - `tests/test_integrations_otel.py::TestFailClosed` を 5 件追加 (5 シナリオ: 単属性例外時の原 value 非流出 / デフォルトログ型名のみ / traceback opt-in / 属性ごと独立 fail-closed / 全属性例外でも全 placeholder set)
+  - SECURITY.md §4 を Langfuse + OTel 統合記述に書き換え (JP / EN 両セクション)
+  - docs/integrations/otel.md に「fail-closed」セクション追加
 - `FakerStrategy._build_faker` の thread-safety 修正（#210、bug fix）:
   - PR #151 (#142 fix) で導入した「strategy 毎に Faker を 1 個共有 + `seed_instance` で seed 差し替え」が複数スレッドからの並行呼び出しで race condition を起こし、決定性 (同一 surface → 同一 fake) が破綻する経路があった
   - `_faker_holder: list` を `_faker_local: threading.local` に変更し、per-thread に Faker インスタンスを持たせる構造に修正
