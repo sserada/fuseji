@@ -335,3 +335,67 @@ class TestIntegrationWithMasker:
         assert "taro@example.com" not in result.text
         # safe domain を含む
         assert any(d in result.text for d in ("example.com", "example.org", "example.net"))
+
+
+class TestSerializationSafety:
+    """#224: シリアライズ経路で `_faker_cache` 内の PII surface を露出させない.
+
+    `pickle.dumps` / `copy.deepcopy` 経由で `_faker_cache` をシリアライズすると
+    cache key として平文 PII surface が pickle bytes / コピーインスタンスに
+    流出するため、`__getstate__` で cache を空 OrderedDict に落とす設計。
+    """
+
+    _SECRET_SURFACE = "田中花子-pickle-test-secret"
+    _SECRET_ENTITY_TYPE = "PERSON"
+
+    def _strategy_with_warmed_cache(self) -> FakerStrategy:
+        """cache に PII surface を載せた strategy を返す."""
+        strategy = FakerStrategy(salt="pickle-test", deterministic=True)
+        # _fake_for を呼ぶと _faker_cache に (entity_type, surface) → fake が入る
+        strategy._fake_for(self._SECRET_ENTITY_TYPE, self._SECRET_SURFACE)
+        # cache に確かに入っていることを前提条件として確認
+        cache_key = f"{self._SECRET_ENTITY_TYPE}:{self._SECRET_SURFACE}"
+        assert cache_key in strategy._faker_cache
+        return strategy
+
+    def test_pickle_round_trip_で_cache_が_空に_なる(self) -> None:
+        import pickle
+
+        strategy = self._strategy_with_warmed_cache()
+        restored = pickle.loads(pickle.dumps(strategy))
+        assert len(restored._faker_cache) == 0
+
+    def test_pickle_bytes_に_原_surface_が_出現しない(self) -> None:
+        """pickle bytes をバイナリ走査して PII が刻まれていないことを確認."""
+        import pickle
+
+        strategy = self._strategy_with_warmed_cache()
+        blob = pickle.dumps(strategy)
+        # 平文 surface は UTF-8 bytes として pickle に出現してはいけない
+        assert self._SECRET_SURFACE.encode("utf-8") not in blob
+
+    def test_deepcopy_後_cache_が_空に_なる(self) -> None:
+        import copy
+
+        strategy = self._strategy_with_warmed_cache()
+        copied = copy.deepcopy(strategy)
+        assert len(copied._faker_cache) == 0
+
+    def test_pickle_復元後も_決定性が_維持される(self) -> None:
+        """salt は pickle 経路で保持されるため、復元後も同一 surface → 同一 fake."""
+        import pickle
+
+        original = FakerStrategy(salt="determinism-test", deterministic=True)
+        fake_before = original._fake_for("PERSON", "山田太郎")
+        restored = pickle.loads(pickle.dumps(original))
+        # cache は空に落ちるが salt は同一なので、同じ surface から同じ fake が再構成される
+        fake_after = restored._fake_for("PERSON", "山田太郎")
+        assert fake_before == fake_after
+
+    def test_repr_は_従来通り_safe(self) -> None:
+        """#224 で追加した __getstate__ が __repr__ の挙動 (#145) を壊していないこと."""
+        strategy = self._strategy_with_warmed_cache()
+        r = repr(strategy)
+        assert "<redacted>" in r
+        # cache の中身が repr に漏れていない
+        assert self._SECRET_SURFACE not in r

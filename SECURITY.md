@@ -130,7 +130,35 @@ app = create_app(detect_include_surface=True)
 
 `FakerStrategy` は `threading.local` で per-thread Faker インスタンスを持ち (#210)、複数スレッドが同時に `seed_instance` を呼んでも決定性 (同一 surface → 同一 fake) が保たれます。`_faker_cache` は dict 単純更新のため GIL 下で安全です。
 
-#### 11. 例外階層
+#### 11. `FakerStrategy` インスタンスのシリアライズ防御 (#224)
+
+`FakerStrategy` の内部 `_faker_cache: OrderedDict` は `(entity_type, surface) → fake` を平文で保持します。`pickle.dumps(strategy)` / `copy.deepcopy(strategy)` 経路でこのキャッシュがそのままシリアライズされると「detect, never retain」原則に反し、worker プロセス・pickle ファイル・shared queue に PII surface が流出します。
+
+これを防ぐため、`__getstate__` / `__setstate__` で `_faker_cache` と `_faker_local` をシリアライズ対象から除外し、復元後は空 cache で再起動するようにしています。決定性 (同一 surface → 同一 fake) は salt が保たれるため復元後も同一プロセス内では維持されます。
+
+```python
+import pickle
+from fuseji.faker_strategy import FakerStrategy
+
+strategy = FakerStrategy(salt="example")
+strategy._fake_for("PERSON", "田中太郎")  # cache に乗る
+
+blob = pickle.dumps(strategy)
+# blob の bytes に "田中太郎" の UTF-8 シーケンスは出現しない（cache 除外済み）
+
+restored = pickle.loads(blob)
+# restored._faker_cache は空 OrderedDict
+# restored._fake_for("PERSON", "田中太郎") は元と同じ fake を返す（salt 経由で決定的）
+```
+
+ただし以下の経路は Python セマンティクス上インターセプト不可で、`_faker_cache` が露出します。**使用しないこと**:
+
+- `vars(strategy)` / `strategy.__dict__`: instance dict 直接参照
+- `dataclasses.asdict(strategy)`: 全 field を辞書化
+
+デバッグでフィールドを参照したい場合は `repr(strategy)` (#145 で safe 化済み、salt も `<redacted>`) を使うか、コンストラクタ引数 (`locale` / `deterministic` / `keep_mapping` / `max_cache_size`) を個別に参照してください。
+
+#### 12. 例外階層
 
 fuseji 由来の例外は `FusejiError` を基底とする階層（`InvalidEntityError` / `InvalidConfigError`）に集約されています。
 
@@ -211,7 +239,8 @@ fuseji follows **detect, never retain**:
     - **FastAPI server body size limit**: default 1 MB. Requests with `Content-Length` exceeding the limit are rejected with HTTP 413. Overridable via `FUSEJI_SERVER_MAX_BODY_BYTES`.
     - **`InMemoryVault.clear()`**: explicit clear is exposed to prevent unbounded memory growth in long-lived processes.
 11. **Thread-safety and concurrent operation**: `InMemoryVault.assign` is guarded by an internal `threading.Lock`, so concurrent calls from a Uvicorn thread pool will not collide on counter assignment or emit duplicate placeholders for the same (type, surface). `get` / `restore` are dict reads protected by the GIL and require no lock. `FakerStrategy` keeps a per-thread `Faker` instance via `threading.local` (#210), so concurrent `seed_instance` calls do not break determinism (same surface → same fake). `_faker_cache` is a simple dict update, safe under the GIL.
-12. **Exception hierarchy**: fuseji-originated exceptions are unified under `FusejiError` (e.g. `InvalidEntityError` / `InvalidConfigError`). Callers can write `except FusejiError:` to scope catches to fuseji. `InvalidEntityError` etc. also inherit from `ValueError`, preserving compatibility with existing `except ValueError`.
+12. **`FakerStrategy` serialization defense (#224)**: `FakerStrategy._faker_cache` keeps `(entity_type, surface) → fake` mappings with raw PII surfaces as keys. `pickle.dumps(strategy)` and `copy.deepcopy(strategy)` are intercepted via `__getstate__` / `__setstate__` so that the cache (and the unpicklable `threading.local`) are dropped at serialization time; the restored instance starts with an empty cache but retains determinism through the salt. Note that `vars(strategy)`, `strategy.__dict__`, and `dataclasses.asdict(strategy)` cannot be intercepted by Python semantics — **do not use them**; use `repr(strategy)` (PII-safe, #145) or read the constructor arguments individually instead.
+13. **Exception hierarchy**: fuseji-originated exceptions are unified under `FusejiError` (e.g. `InvalidEntityError` / `InvalidConfigError`). Callers can write `except FusejiError:` to scope catches to fuseji. `InvalidEntityError` etc. also inherit from `ValueError`, preserving compatibility with existing `except ValueError`.
 
 ### Caller responsibilities
 
